@@ -1,2 +1,5 @@
 .env
 node_modules
+.dfx
+dist
+src/declarations/

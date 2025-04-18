@@ -15,4 +15,4 @@ RUN dfx --version
 
 COPY --from=node-deps /app /app
 
-CMD ["dfx", "start", "--background"]
+CMD dfx start --background && dfx deploy
