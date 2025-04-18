@@ -7,8 +7,8 @@ import '../index.css';
 const network = process.env.DFX_NETWORK;
 const identityProvider =
   network === 'ic'
-    ? 'https://identity.ic0.app' // Mainnet
-    : 'http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943'; // Local
+    ? 'https://identity.ic0.app' 
+    : 'http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943'; 
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
