@@ -8,6 +8,11 @@ COPY . .
 FROM ubuntu:22.04
 WORKDIR /app
 
+RUN apt-get update && \
+    apt-get install -y curl ca-certificates gnupg lsb-release build-essential pkg-config libssl-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN apt-get update && apt-get install -y curl
 
 RUN sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"

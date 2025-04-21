@@ -1,118 +1,92 @@
-import { AuthClient } from '@dfinity/auth-client';
-import { createActor } from 'declarations/backend';
-import { canisterId } from 'declarations/backend/index.js';
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../index.css';
 
-const network = process.env.DFX_NETWORK;
-const identityProvider =
-  network === 'ic'
-    ? 'https://identity.ic0.app' 
-    : 'http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943'; 
-
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authClient, setAuthClient] = useState();
-  const [actor, setActor] = useState();
+function App({actor}) {
+ const navigate = useNavigate();
   const [files, setFiles] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
   const [fileTransferProgress, setFileTransferProgress] = useState();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    updateActor();
-    setErrorMessage();
-  }, []);
+    if (!isAuthenticated) {
+      navigate('/');
+      return;
+    }
 
-  useEffect(() => {
-    if (isAuthenticated) {
+    if (actor) {
       loadFiles();
     }
-  }, [isAuthenticated]);
-
-  async function updateActor() {
-    const authClient = await AuthClient.create();
-    const identity = authClient.getIdentity();
-    const actor = createActor(canisterId, {
-      agentOptions: {
-        identity
-      }
-    });
-    const isAuthenticated = await authClient.isAuthenticated();
-
-    setActor(actor);
-    setAuthClient(authClient);
-    setIsAuthenticated(isAuthenticated);
-  }
-
-  async function login() {
-    await authClient.login({
-      identityProvider,
-      onSuccess: updateActor
-    });
-  }
-
-  async function logout() {
-    await authClient.logout();
-    updateActor();
-  }
+  }, [actor, isAuthenticated, navigate]);
 
   async function loadFiles() {
+    setIsLoading(true);
     try {
       const fileList = await actor.getFiles();
       setFiles(fileList);
     } catch (error) {
       console.error('Failed to load files:', error);
       setErrorMessage('Failed to load files. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   }
 
   async function handleFileUpload(event) {
     const file = event.target.files[0];
-    setErrorMessage();
+    setErrorMessage(null);
 
     if (!file) {
       setErrorMessage('Please select a file to upload.');
       return;
     }
 
-    if (await actor.checkFileExists(file.name)) {
-      setErrorMessage(`File "${file.name}" already exists. Please choose a different file name.`);
-      return;
-    }
-    setFileTransferProgress({
-      mode: 'Uploading',
-      fileName: file.name,
-      progress: 0
-    });
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const content = new Uint8Array(e.target.result);
-      const chunkSize = 1024 * 1024; // 1 MB chunks
-      const totalChunks = Math.ceil(content.length / chunkSize);
-
-      try {
-        for (let i = 0; i < totalChunks; i++) {
-          const start = i * chunkSize;
-          const end = Math.min(start + chunkSize, content.length);
-          const chunk = content.slice(start, end);
-
-          await actor.uploadFileChunk(file.name, chunk, BigInt(i), file.type);
-          setFileTransferProgress((prev) => ({
-            ...prev,
-            progress: Math.floor(((i + 1) / totalChunks) * 100)
-          }));
-        }
-      } catch (error) {
-        console.error('Upload failed:', error);
-        setErrorMessage(`Failed to upload ${file.name}: ${error.message}`);
-      } finally {
-        await loadFiles();
-        setFileTransferProgress(null);
+    try {
+      const fileExists = await actor.checkFileExists(file.name);
+      if (fileExists) {
+        setErrorMessage(`File "${file.name}" already exists. Please choose a different file name.`);
+        return;
       }
-    };
 
-    reader.readAsArrayBuffer(file);
+      setFileTransferProgress({
+        mode: 'Uploading',
+        fileName: file.name,
+        progress: 0
+      });
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const content = new Uint8Array(e.target.result);
+        const chunkSize = 1024 * 1024; // 1 MB chunks
+        const totalChunks = Math.ceil(content.length / chunkSize);
+
+        try {
+          for (let i = 0; i < totalChunks; i++) {
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, content.length);
+            const chunk = content.slice(start, end);
+
+            await actor.uploadFileChunk(file.name, chunk, BigInt(i), file.type);
+            setFileTransferProgress((prev) => ({
+              ...prev,
+              progress: Math.floor(((i + 1) / totalChunks) * 100)
+            }));
+          }
+        } catch (error) {
+          console.error('Upload failed:', error);
+          setErrorMessage(`Failed to upload ${file.name}: ${error.message}`);
+        } finally {
+          await loadFiles();
+          setFileTransferProgress(null);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error('Error checking file exists:', error);
+      setErrorMessage(`Error: ${error.message}`);
+    }
   }
 
   async function handleFileDownload(name) {
@@ -123,13 +97,17 @@ function App() {
     });
     try {
       const totalChunks = Number(await actor.getTotalChunks(name));
-      const fileType = await actor.getFileType(name)[0];
+      const fileTypeResult = await actor.getFileType(name);
+      const fileType = fileTypeResult && fileTypeResult.length > 0 ? fileTypeResult[0] : '';
+      
       let chunks = [];
 
       for (let i = 0; i < totalChunks; i++) {
-        const chunkBlob = await actor.getFileChunk(name, BigInt(i));
+        const chunkResult = await actor.getFileChunk(name, BigInt(i));
+        const chunkBlob = chunkResult && chunkResult.length > 0 ? chunkResult[0] : null;
+        
         if (chunkBlob) {
-          chunks.push(chunkBlob[0]);
+          chunks.push(chunkBlob);
         } else {
           throw new Error(`Failed to retrieve chunk ${i}`);
         }
