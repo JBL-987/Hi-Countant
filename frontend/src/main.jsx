@@ -5,7 +5,7 @@ import { AuthClient } from '@dfinity/auth-client';
 import { createActor } from 'declarations/backend';
 import { canisterId } from 'declarations/backend/index.js';
 import Navbar_Component from './Navbar';
-import { Footer_Component } from './Footer';
+import Footer_Component from './Footer';
 import Home from './Home';
 import App from './App';
 import '../index.css';
@@ -105,10 +105,7 @@ function Main() {
           path="/"
           element={
             <Home
-              actor={actor}
               isAuthenticated={isAuthenticated}
-              login={login}
-              logout={logout}
             />
           }
         />
@@ -119,6 +116,7 @@ function Main() {
               <App 
                 actor={actor}
                 isAuthenticated={isAuthenticated}
+                login={login}
                 logout={logout}
               />
             </ProtectedRoute>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../index.css';
 
-function App({actor}) {
+function App({actor,isAuthenticated, login, logout }) {
  const navigate = useNavigate();
   const [files, setFiles] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
