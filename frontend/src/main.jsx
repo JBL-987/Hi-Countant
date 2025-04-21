@@ -4,10 +4,10 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import { AuthClient } from '@dfinity/auth-client';
 import { createActor } from 'declarations/backend';
 import { canisterId } from 'declarations/backend/index.js';
-import Navbar_Component from './Navbar';
-import Footer_Component from './Footer';
-import Home from './Home';
-import App from './App';
+import Navbar_Component from './components/Navbar';
+import Footer_Component from './components/Footer';
+import Home from './pages/Home';
+import App from './pages/App';
 import '../index.css';
 
 const network = process.env.DFX_NETWORK;
