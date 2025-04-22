@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../index.css';
+import { Upload, Download, Trash2, FileText, AlertCircle } from 'lucide-react';
 
-function App({actor,isAuthenticated, login, logout }) {
- const navigate = useNavigate();
+function App({ actor, isAuthenticated, login, logout }) {
+  const navigate = useNavigate();
   const [files, setFiles] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
   const [fileTransferProgress, setFileTransferProgress] = useState();
   const [isLoading, setIsLoading] = useState(true);
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -35,6 +36,31 @@ function App({actor,isAuthenticated, login, logout }) {
 
   async function handleFileUpload(event) {
     const file = event.target.files[0];
+    handleUploadLogic(file);
+  }
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleUploadLogic(e.dataTransfer.files[0]);
+    }
+  };
+
+  async function handleUploadLogic(file) {
     setErrorMessage(null);
 
     if (!file) {
@@ -149,71 +175,132 @@ function App({actor,isAuthenticated, login, logout }) {
     }
   }
 
-  return (
-    <div className="container mx-auto p-4">
-      <div className="flex flex-row justify-between">
-        <h1 className="mb-4 text-2xl font-bold">FileVault</h1>
+  const getFileIcon = (fileName) => {
+    const extension = fileName.split('.').pop().toLowerCase();
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
+    const documentExtensions = ['pdf', 'doc', 'docx', 'txt', 'rtf'];
+    const videoExtensions = ['mp4', 'mov', 'avi', 'webm'];
+    const audioExtensions = ['mp3', 'wav', 'ogg', 'm4a'];
+    
+    return <FileText className="text-gray-600" />;
+  };
 
-        {isAuthenticated ? (
-          <button onClick={logout} className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
-            Logout
-          </button>
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-black p-4">
+      <div className="container mx-auto max-w-3xl">
+        {!isAuthenticated ? (
+          <div className="rounded-xl bg-gray-500 border-white p-8 text-center shadow-lg">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+              <AlertCircle className="h-8 w-8 text-blue-600" />
+            </div>
+            <h2 className="mb-3 text-2xl font-bold text-gray-800">Authentication Required</h2>
+            <p className="mb-6 text-gray-600">Please sign in to access your secure Hi! Countant storage.</p>
+            <button 
+              onClick={login} 
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
+            >
+              Login with Internet Identity
+            </button>
+          </div>
         ) : (
-          <button onClick={login} className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
-            Login with Internet Identity
-          </button>
+          <div className="space-y-6"> 
+            <div 
+              className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'} bg-white p-10 shadow-md transition-colors`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            >
+              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
+                <Upload className="h-10 w-10 text-blue-600" />
+              </div>
+              <p className="mb-2 text-xl font-medium text-gray-800">Drag and drop your files here</p>
+              <p className="mb-6 text-sm text-gray-500">or click to browse</p>
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="fileInput"
+              />
+              <label
+                htmlFor="fileInput"
+                className="cursor-pointer rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300"
+              >
+                Choose File
+              </label>
+            </div>
+
+            {errorMessage && (
+              <div className="flex items-center rounded-lg bg-red-50 p-4 text-sm text-red-800 shadow-sm">
+                <AlertCircle className="mr-3 h-5 w-5" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {fileTransferProgress && (
+              <div className="rounded-lg bg-white p-6 shadow-md">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-base font-medium text-gray-800">
+                    {fileTransferProgress.mode} {fileTransferProgress.fileName}
+                  </span>
+                  <span className="text-base font-medium text-blue-600">{fileTransferProgress.progress}%</span>
+                </div>
+                <div className="h-2.5 w-full rounded-full bg-gray-200">
+                  <div 
+                    className="h-2.5 rounded-full bg-blue-600 transition-all duration-300" 
+                    style={{ width: `${fileTransferProgress.progress}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-xl bg-white p-6 shadow-lg">
+              <h2 className="mb-6 text-2xl font-bold text-gray-800">Your Files</h2>
+              
+              {isLoading ? (
+                <div className="py-12 text-center">
+                  <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+                  <p className="mt-4 text-gray-500">Loading your files...</p>
+                </div>
+              ) : files.length === 0 ? (
+                <div className="py-16 text-center">
+                  <FileText className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                  <p className="text-lg text-gray-500">You have no files yet. Upload some to get started!</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {files.map((file) => (
+                    <div key={file.name} className="flex flex-col items-start justify-between gap-4 py-4 sm:flex-row sm:items-center">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                          {getFileIcon(file.name)}
+                        </div>
+                        <span className="text-base font-medium text-gray-800">{file.name}</span>
+                      </div>
+                      <div className="flex w-full space-x-3 sm:w-auto">
+                        <button 
+                          onClick={() => handleFileDownload(file.name)} 
+                          className="flex flex-1 items-center justify-center rounded-lg bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 sm:flex-initial"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </button>
+                        <button 
+                          onClick={() => handleFileDelete(file.name)} 
+                          className="flex flex-1 items-center justify-center rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 sm:flex-initial"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
-
-      {!isAuthenticated ? (
-        <div className="mt-4 rounded-md border-l-4 bg-neutral-200 p-4 shadow-md">
-          <p className="mt-2 text-black">Please sign in to access the file vault.</p>
-        </div>
-      ) : (
-        <div>
-          <div className="mb-4">
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-full file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-            />
-          </div>
-
-          {errorMessage && (
-            <div className="mt-4 rounded-md border border-red-400 bg-red-100 p-3 text-red-700">{errorMessage}</div>
-          )}
-
-          {fileTransferProgress && (
-            <div className="mb-4">
-              <p className="mb-2 text-sm text-gray-600">
-                {`${fileTransferProgress.mode} ${fileTransferProgress.fileName} ... ${fileTransferProgress.progress}%`}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {files.length === 0 ? (
-              <p className="py-8 text-center text-gray-500">You have no files. Upload some!</p>
-            ) : (
-              files.map((file) => (
-                <div key={file.name} className="flex items-center justify-between rounded-lg bg-white p-3 shadow">
-                  <div className="flex items-center space-x-2">
-                    <span>{file.name}</span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button onClick={() => handleFileDownload(file.name)} className="btn">
-                      Download
-                    </button>
-                    <button onClick={() => handleFileDelete(file.name)} className="btn">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
