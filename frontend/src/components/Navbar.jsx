@@ -25,14 +25,13 @@ const Navbar_Component = ({ isAuthenticated, login, logout }) => {
   return (
     <nav className="bg-black/80 backdrop-blur-md fixed w-full z-50 top-0 start-0 border-b border-blue-900/30 shadow-lg">
       <div className="max-w-7xl flex flex-wrap items-center justify-between mx-auto p-4">
-        <a href="/" className="flex items-center space-x-3 rtl:space-x-reverse">
+        <div className="flex items-center space-x-3 rtl:space-x-reverse">
           <Logo className="h-8 w-8" />
           <span className="self-center text-2xl font-bold whitespace-nowrap text-white bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
             Hi! Countant
           </span>
-        </a>
+        </div>
 
-        {/* Mobile menu button */}
         <button
           onClick={toggleMobileMenu}
           className="md:hidden text-white hover:text-blue-400 focus:outline-none"
@@ -40,26 +39,22 @@ const Navbar_Component = ({ isAuthenticated, login, logout }) => {
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
 
-        {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-8">
-          <a
-            href="#features"
-            className="text-gray-300 hover:text-blue-400 transition-colors"
-          >
+          {!isAuthenticated ? (
+          <>
+          <a href="#features" className="text-gray-300 hover:text-blue-400 transition-colors">
             Features
           </a>
-          <a
-            href="#benefits"
-            className="text-gray-300 hover:text-blue-400 transition-colors"
-          >
+          <a href="#benefits" className="text-gray-300 hover:text-blue-400 transition-colors">
             Benefits
           </a>
-          <a
-            href="#testimonials"
-            className="text-gray-300 hover:text-blue-400 transition-colors"
-          >
+          <a href="#testimonials" className="text-gray-300 hover:text-blue-400 transition-colors">
             Testimonials
           </a>
+        </>
+       ) : (
+       <></>
+        )}
 
           {isAuthenticated ? (
             <button
@@ -78,7 +73,6 @@ const Navbar_Component = ({ isAuthenticated, login, logout }) => {
           )}
         </div>
 
-        {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <div className="md:hidden w-full mt-4 bg-gray-900 rounded-lg p-4 border border-blue-900/30">
             <div className="flex flex-col space-y-4">
