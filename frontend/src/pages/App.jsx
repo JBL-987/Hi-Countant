@@ -183,10 +183,11 @@ Document: ${truncatedContent}
 
       // Extract the content from Gemini's response format
       const content = result.candidates[0].content.parts[0].text;
+      const cleanedcontent = content.replace(/[\*`']/g, '');
 
       setAnalysisResult({
         fileName: fileName,
-        content: content,
+        content: cleanedcontent,
       });
 
       return result;
@@ -446,8 +447,6 @@ Document: ${truncatedContent}
       }
 
       const data = new Blob(chunks, { type: fileType });
-
-      // Determine how to read the file based on its type
       const isTextBased =
         fileType.includes("text") ||
         fileType.includes("csv") ||
@@ -653,8 +652,6 @@ Document: ${truncatedContent}
   }
 
   const getFileIcon = () => {
-    // Simplified version - just return a file icon
-    // We can enhance this later to show different icons based on file type
     return <FileText className="text-gray-400" />;
   };
 
@@ -755,16 +752,6 @@ Document: ${truncatedContent}
                     </button>
                   ))}
                 </nav>
-              </div>
-
-              {/* User menu */}
-              <div className="border-t border-blue-900/30 p-4">
-                <button
-                  onClick={logout}
-                  className="flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-md hover:bg-gray-700 transition-colors"
-                >
-                  <span>Logout</span>
-                </button>
               </div>
             </div>
           </div>
