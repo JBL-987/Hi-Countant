@@ -1,102 +1,49 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Upload,
-  Download,
-  Trash2,
   FileText,
-  AlertCircle,
-  Eye,
-  X,
   BarChart3,
   Calculator,
   ClipboardCheck,
   PieChart,
-  Calendar,
-  CreditCard,
   DollarSign,
-  Wallet,
-  ArrowUpRight,
-  Plus,
   Search,
   Bell,
   Settings,
-  ChevronDown,
   Users,
-  Building,
-  Receipt,
   FileSpreadsheet,
   Menu,
+  TrendingUp,
+  ChevronRight,
+  Receipt,
+  Folder,
+  Image,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Logo from "../components/Logo";
 
-function App({ actor, isAuthenticated, login, logout }) {
+// Import Accountant components
+import DataInput from "../components/accountant/DataInput";
+import Workspace from "../components/accountant/Workspace";
+import Validation from "../components/accountant/Validation";
+import Analysis from "../components/accountant/Analysis";
+import Reports from "../components/accountant/Reports";
+import Recommendations from "../components/accountant/Recommendations";
+
+function App({ actor, isAuthenticated, login }) {
   const navigate = useNavigate();
   const [files, setFiles] = useState([]);
+  const [manualEntries, setManualEntries] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
   const [fileTransferProgress, setFileTransferProgress] = useState();
   const [isLoading, setIsLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analyzingFile, setAnalyzingFile] = useState("");
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeMainCategory, setActiveMainCategory] = useState("accountant");
+  const [activeSubTab, setActiveSubTab] = useState("data-input");
 
-  // Sample data for the dashboard
-  const financialSummary = {
-    revenue: 24850,
-    expenses: 18340,
-    profit: 6510,
-    pendingInvoices: 3200,
-    upcomingBills: 1850,
-  };
-
-  const recentTransactions = [
-    {
-      id: 1,
-      date: "2023-11-15",
-      description: "Client Payment - ABC Corp",
-      amount: 2500,
-      type: "income",
-    },
-    {
-      id: 2,
-      date: "2023-11-14",
-      description: "Office Supplies",
-      amount: 120,
-      type: "expense",
-    },
-    {
-      id: 3,
-      date: "2023-11-12",
-      description: "Software Subscription",
-      amount: 49.99,
-      type: "expense",
-    },
-    {
-      id: 4,
-      date: "2023-11-10",
-      description: "Client Payment - XYZ Ltd",
-      amount: 1800,
-      type: "income",
-    },
-  ];
-
-  const upcomingDeadlines = [
-    {
-      id: 1,
-      date: "2023-12-15",
-      description: "Quarterly Tax Filing",
-      type: "tax",
-    },
-    { id: 2, date: "2023-12-01", description: "Rent Payment", type: "bill" },
-    {
-      id: 3,
-      date: "2023-11-25",
-      description: "Client Invoice Due",
-      type: "invoice",
-    },
-  ];
+  // Sample data removed as it's no longer needed with the new component structure
 
   const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4";
 
@@ -183,11 +130,96 @@ Document: ${truncatedContent}
 
       // Extract the content from Gemini's response format
       const content = result.candidates[0].content.parts[0].text;
-      const cleanedcontent = content.replace(/[\*`']/g, '');
+      const cleanedcontent = content.replace(/[\*`']/g, "");
 
       setAnalysisResult({
         fileName: fileName,
         content: cleanedcontent,
+      });
+
+      return result;
+    } catch (error) {
+      Swal.close();
+      Swal.fire({
+        icon: "error",
+        title: "Processing Failed",
+        text: `Failed to process ${fileName}: ${error.message}`,
+      });
+      console.error("AI processing failed:", error);
+      setAnalyzingFile("");
+      return null;
+    }
+  }
+
+  // Function to process binary files (PDFs, images, etc.) using Gemini's multimodal capabilities
+  async function processDocumentWithBinaryData(
+    base64Data,
+    fileName,
+    fileTypeContext,
+    mimeType
+  ) {
+    try {
+      setAnalyzingFile(fileName);
+
+      Swal.fire({
+        title: "Processing document...",
+        text: `Analyzing ${fileName} with Gemini AI`,
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      // Construct the API request with multimodal content (text + image/PDF)
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `You are Hi! Countant, an AI accountant assistant. Please analyze this ${fileTypeContext} file and provide:\n\n1. A summary of key financial information\n2. Any important dates, amounts, or transactions\n3. Accounting implications or recommendations\n4. Potential tax considerations\n5. Any anomalies or items that require attention\n\nFile name: ${fileName}`,
+                  },
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: base64Data,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.2,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          `Gemini API error: ${errorData.error?.message || response.statusText}`
+        );
+      }
+
+      const result = await response.json();
+      Swal.close();
+
+      // Extract the content from Gemini's response format
+      const content = result.candidates[0].content.parts[0].text;
+
+      setAnalysisResult({
+        fileName: fileName,
+        content: content,
       });
 
       return result;
@@ -412,42 +444,39 @@ Document: ${truncatedContent}
         name.endsWith(".svg");
 
       if (isTextBased || isSpreadsheet || isDocument || isPDF || isImage) {
-        const reader = new FileReader();
+        // For text-based files, read as text
+        if (isTextBased) {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const fileContent = e.target.result;
+            const contentWithContext = `This is a text file.\n\nFile name: ${name}\n\nContent:\n${fileContent}`;
+            await processDocumentWithAI(contentWithContext, name);
+          };
+          reader.readAsText(data);
+        }
+        // For binary files (PDFs, images, etc.), convert to base64 and send to Gemini
+        else {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const base64Content = e.target.result.split(",")[1]; // Remove the data URL prefix
 
-        reader.onload = async (e) => {
-          let fileContent = e.target.result;
+            // Determine file type for context
+            let fileTypeContext = "";
+            if (isSpreadsheet) fileTypeContext = "spreadsheet";
+            if (isDocument) fileTypeContext = "document";
+            if (isPDF) fileTypeContext = "PDF";
+            if (isImage) fileTypeContext = "image";
 
-          // Add context about the file type to help Gemini process it better
-          let fileTypeContext = "";
-          if (isTextBased) fileTypeContext = "This is a text file.";
-          if (isSpreadsheet) fileTypeContext = "This is a spreadsheet file.";
-          if (isDocument) fileTypeContext = "This is a document file.";
-          if (isPDF) fileTypeContext = "This is a PDF file.";
-          if (isImage)
-            fileTypeContext =
-              "This is an image file (text content may be limited).";
-
-          // For binary files that were read as text, we might get garbled content
-          // Add a note about this to the AI
-          if (
-            ((isSpreadsheet || isDocument || isPDF || isImage) &&
-              fileContent.includes("�")) ||
-            fileContent.length > 100000
-          ) {
-            fileContent = `[This file appears to be in binary format and couldn't be fully parsed as text. Here's a sample of the content that could be extracted:]\n\n${fileContent.substring(
-              0,
-              5000
-            )}`;
-          }
-
-          // Combine the context with the content
-          const contentWithContext = `${fileTypeContext}\n\nFile name: ${name}\n\nContent:\n${fileContent}`;
-
-          await processDocumentWithAI(contentWithContext, name);
-        };
-
-        // Always try to read as text first - Gemini works best with text
-        reader.readAsText(data);
+            // Send the binary data to Gemini for processing
+            await processDocumentWithBinaryData(
+              base64Content,
+              name,
+              fileTypeContext,
+              fileType
+            );
+          };
+          reader.readAsDataURL(data);
+        }
       } else {
         Swal.close();
         Swal.fire({
@@ -467,12 +496,15 @@ Document: ${truncatedContent}
     }
   }
 
-  async function handleFileDownload(name) {
-    setFileTransferProgress({
-      mode: "Downloading",
-      fileName: name,
-      progress: 0,
-    });
+  async function handleFileDownload(name, forPreview = false) {
+    if (!forPreview) {
+      setFileTransferProgress({
+        mode: "Downloading",
+        fileName: name,
+        progress: 0,
+      });
+    }
+
     try {
       const totalChunks = Number(await actor.getTotalChunks(name));
       const fileTypeResult = await actor.getFileType(name);
@@ -492,13 +524,45 @@ Document: ${truncatedContent}
           throw new Error(`Failed to retrieve chunk ${i}`);
         }
 
-        setFileTransferProgress((prev) => ({
-          ...prev,
-          progress: Math.floor(((i + 1) / totalChunks) * 100),
-        }));
+        if (!forPreview) {
+          setFileTransferProgress((prev) => ({
+            ...prev,
+            progress: Math.floor(((i + 1) / totalChunks) * 100),
+          }));
+        }
       }
 
-      const data = new Blob(chunks, { type: fileType });
+      // Create a blob from the chunks
+      let mimeType = fileType;
+
+      // Set appropriate MIME types based on file extension
+      if (!fileType || fileType === "") {
+        if (name.toLowerCase().endsWith(".csv")) {
+          mimeType = "text/csv";
+        } else if (name.toLowerCase().endsWith(".xlsx")) {
+          mimeType =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        } else if (name.toLowerCase().endsWith(".xls")) {
+          mimeType = "application/vnd.ms-excel";
+        } else if (name.toLowerCase().endsWith(".docx")) {
+          mimeType =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        } else if (name.toLowerCase().endsWith(".doc")) {
+          mimeType = "application/msword";
+        }
+      }
+
+      console.log(`Creating blob for ${name} with type: ${mimeType}`);
+      const data = new Blob(chunks, { type: mimeType });
+      console.log(`Created blob: size=${data.size}, type=${data.type}`);
+
+      // If this is for preview, return the blob instead of triggering a download
+      if (forPreview) {
+        console.log(`Returning blob for preview: ${name}`);
+        return data;
+      }
+
+      // Otherwise, proceed with download
       const url = URL.createObjectURL(data);
       const link = document.createElement("a");
       link.href = url;
@@ -513,16 +577,23 @@ Document: ${truncatedContent}
         timer: 2000,
         timerProgressBar: true,
       });
+
+      return null; // Return null for normal downloads
     } catch (error) {
       console.error("Download failed:", error);
-      setErrorMessage(`Failed to download ${name}: ${error.message}`);
-      Swal.fire({
-        icon: "error",
-        title: "Download Failed",
-        text: `Failed to download ${name}: ${error.message}`,
-      });
+      if (!forPreview) {
+        setErrorMessage(`Failed to download ${name}: ${error.message}`);
+        Swal.fire({
+          icon: "error",
+          title: "Download Failed",
+          text: `Failed to download ${name}: ${error.message}`,
+        });
+      }
+      return null;
     } finally {
-      setFileTransferProgress(null);
+      if (!forPreview) {
+        setFileTransferProgress(null);
+      }
     }
   }
 
@@ -569,7 +640,169 @@ Document: ${truncatedContent}
     });
   }
 
-  const getFileIcon = () => {
+  // Function to handle saving manual data entries
+  async function handleSaveManualData(data) {
+    try {
+      Swal.fire({
+        title: "Generating Document...",
+        text: "Please wait while we create your transaction record",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      // Import the PDF generator dynamically
+      const { generateTransactionPDF } = await import("../utils/pdfGenerator");
+
+      // Generate a PDF from the transaction data
+      console.log("Generating PDF for transaction:", data);
+
+      // Make sure amount is a number
+      if (typeof data.amount === "string") {
+        data.amount = parseFloat(data.amount) || 0;
+      }
+
+      // Make sure line items have numeric amounts
+      if (data.lineItems && Array.isArray(data.lineItems)) {
+        data.lineItems = data.lineItems.map((item) => ({
+          ...item,
+          amount:
+            typeof item.amount === "string"
+              ? parseFloat(item.amount) || 0
+              : item.amount,
+        }));
+      }
+
+      const pdfBlob = generateTransactionPDF(data);
+      console.log("PDF generated successfully:", pdfBlob);
+
+      // Create a filename based on the transaction data
+      const date = new Date(data.date).toISOString().split("T")[0];
+      const type =
+        data.transactionType.charAt(0).toUpperCase() +
+        data.transactionType.slice(1);
+      const amount = parseFloat(data.amount).toFixed(2).replace(".", "_");
+      const timestamp = Date.now().toString().slice(-6); // Use last 6 digits of timestamp for uniqueness
+      const fileName = `Transaction_${date}_${type}_${amount}_${timestamp}.pdf`;
+
+      // In a real application, you would save this to the backend
+      const newEntry = {
+        id: Date.now().toString(), // Generate a unique ID
+        ...data,
+        createdAt: new Date().toISOString(),
+        fileName: fileName,
+      };
+
+      setManualEntries((prevEntries) => [...prevEntries, newEntry]);
+
+      // Upload the PDF to the backend as if it were a file
+      await uploadPdfToBackend(pdfBlob, fileName);
+
+      // Close the loading dialog
+      Swal.close();
+
+      // Show success message
+      Swal.fire({
+        icon: "success",
+        title: "Transaction Saved",
+        text: "Your transaction has been recorded and added to your documents!",
+        timer: 2000,
+        timerProgressBar: true,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Failed to save transaction:", error);
+      Swal.close();
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: `Failed to save transaction: ${error.message}`,
+      });
+      return false;
+    }
+  }
+
+  // Helper function to upload PDF to backend
+  async function uploadPdfToBackend(pdfBlob, fileName) {
+    try {
+      setFileTransferProgress({
+        mode: "Uploading",
+        fileName: fileName,
+        progress: 0,
+      });
+
+      // Convert blob to array buffer for upload
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const content = new Uint8Array(arrayBuffer);
+
+      // Use the same chunk-based upload mechanism as for regular files
+      const chunkSize = 1024 * 1024; // 1MB chunks
+      const totalChunks = Math.ceil(content.length / chunkSize);
+
+      // Check if file already exists
+      const fileExists = await actor.checkFileExists(fileName);
+      if (fileExists) {
+        // Append a unique identifier to avoid overwriting
+        const timestamp = Date.now();
+        fileName = fileName.replace(".pdf", `_${timestamp}.pdf`);
+      }
+
+      // Upload chunks
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, content.length);
+        const chunk = content.slice(start, end);
+
+        await actor.uploadFileChunk(
+          fileName,
+          chunk,
+          BigInt(i),
+          "application/pdf"
+        );
+
+        setFileTransferProgress((prev) => ({
+          ...prev,
+          progress: Math.floor(((i + 1) / totalChunks) * 100),
+        }));
+      }
+
+      // Refresh the file list
+      await loadFiles();
+      setFileTransferProgress(null);
+
+      return true;
+    } catch (error) {
+      console.error("Failed to upload PDF:", error);
+      setErrorMessage(`Failed to upload transaction record: ${error.message}`);
+      setFileTransferProgress(null);
+      throw error;
+    }
+  }
+
+  const getFileIcon = (fileName) => {
+    // Check if this is a transaction PDF (follows our naming pattern)
+    if (
+      fileName &&
+      (fileName.startsWith("Transaction_") ||
+        fileName.match(/^\d{4}-\d{2}-\d{2}_[A-Z][a-z]+/))
+    ) {
+      return <Calculator className="text-green-400" />;
+    }
+
+    // Check file extension
+    const extension = fileName?.split(".").pop()?.toLowerCase();
+
+    if (extension === "pdf") {
+      return <FileText className="text-red-400" />;
+    } else if (["jpg", "jpeg", "png", "gif"].includes(extension)) {
+      return <Image className="text-purple-400" />;
+    } else if (["xlsx", "xls", "csv"].includes(extension)) {
+      return <FileSpreadsheet className="text-blue-400" />;
+    }
+
+    // For other files, return the default icon
     return <FileText className="text-gray-400" />;
   };
 
@@ -578,34 +811,60 @@ Document: ${truncatedContent}
     setAnalyzingFile("");
   };
 
-  // Sidebar navigation items
-  const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: <BarChart3 size={20} /> },
-    { id: "track", label: "Track", icon: <Calculator size={20} /> },
-    { id: "audit", label: "Audit", icon: <ClipboardCheck size={20} /> },
-    { id: "estimate", label: "Estimate", icon: <PieChart size={20} /> },
-    { id: "independent", label: "Independent", icon: <FileText size={20} /> },
+  // Main navigation categories
+  const mainCategories = [
     {
-      id: "documents",
-      label: "Documents",
-      icon: <FileSpreadsheet size={20} />,
+      id: "accountant",
+      label: "Agentic Accountant",
+      icon: <Calculator size={20} />,
+      active: activeMainCategory === "accountant",
+    },
+    {
+      id: "advisor",
+      label: "Agentic Advisor",
+      icon: <Users size={20} />,
+      active: activeMainCategory === "advisor",
     },
   ];
 
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
+  // Accountant sub-navigation items
+  const accountantSubItems = [
+    {
+      id: "data-input",
+      label: "Data Input",
+      icon: <FileSpreadsheet size={20} />,
+    },
+    {
+      id: "workspace",
+      label: "Workspace",
+      icon: <Folder size={20} />,
+    },
+    {
+      id: "validation",
+      label: "Validation",
+      icon: <ClipboardCheck size={20} />,
+    },
+    { id: "analysis", label: "Analysis", icon: <PieChart size={20} /> },
+    { id: "reports", label: "Reports", icon: <FileText size={20} /> },
+    {
+      id: "recommendations",
+      label: "Recommendations",
+      icon: <BarChart3 size={20} />,
+    },
+  ];
 
-  // Format date
-  const formatDate = (dateString) => {
-    const options = { month: "short", day: "numeric", year: "numeric" };
-    return new Date(dateString).toLocaleDateString("en-US", options);
-  };
+  // Advisor sub-navigation items (for future implementation)
+  const advisorSubItems = [
+    {
+      id: "financial-planning",
+      label: "Financial Planning",
+      icon: <DollarSign size={20} />,
+    },
+    { id: "investment", label: "Investment", icon: <TrendingUp size={20} /> },
+    { id: "tax-strategy", label: "Tax Strategy", icon: <Receipt size={20} /> },
+  ];
+
+  // Formatting functions moved to individual components
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -646,29 +905,110 @@ Document: ${truncatedContent}
 
               {/* Navigation */}
               <div className="flex-1 overflow-y-auto py-4">
-                <nav className="px-2 space-y-1">
-                  {navItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        activeTab === item.id
-                          ? "bg-gradient-to-r from-blue-900/50 to-purple-900/50 text-white border border-blue-500/30"
-                          : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                      }`}
-                    >
-                      <span
-                        className={`mr-3 ${
-                          activeTab === item.id
-                            ? "text-blue-400"
-                            : "text-gray-400"
+                <nav className="px-2 space-y-6">
+                  {/* Main Categories */}
+                  <div className="space-y-1">
+                    {mainCategories.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => {
+                          setActiveMainCategory(category.id);
+                          // Set default sub-tab for the category
+                          if (category.id === "accountant") {
+                            setActiveSubTab("data-input");
+                          } else if (category.id === "advisor") {
+                            setActiveSubTab("financial-planning");
+                          }
+                        }}
+                        className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          activeMainCategory === category.id
+                            ? "bg-gradient-to-r from-blue-600/50 to-purple-600/50 text-white border border-blue-500/30"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
                         }`}
                       >
-                        {item.icon}
-                      </span>
-                      {item.label}
-                    </button>
-                  ))}
+                        <div className="flex items-center">
+                          <span
+                            className={`mr-3 ${
+                              activeMainCategory === category.id
+                                ? "text-blue-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {category.icon}
+                          </span>
+                          {category.label}
+                        </div>
+                        {category.active && (
+                          <ChevronRight size={16} className="text-gray-400" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-gray-800"></div>
+
+                  {/* Sub-items for Accountant */}
+                  {activeMainCategory === "accountant" && (
+                    <div className="space-y-1 pl-2">
+                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Accountant Features
+                      </p>
+                      {accountantSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveSubTab(item.id)}
+                          className={`flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            activeSubTab === item.id
+                              ? "bg-gradient-to-r from-blue-900/30 to-purple-900/30 text-white"
+                              : "text-gray-400 hover:bg-gray-800 hover:text-gray-300"
+                          }`}
+                        >
+                          <span
+                            className={`mr-3 ${
+                              activeSubTab === item.id
+                                ? "text-blue-400"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {item.icon}
+                          </span>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Sub-items for Advisor */}
+                  {activeMainCategory === "advisor" && (
+                    <div className="space-y-1 pl-2">
+                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Advisor Features
+                      </p>
+                      {advisorSubItems.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveSubTab(item.id)}
+                          className={`flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            activeSubTab === item.id
+                              ? "bg-gradient-to-r from-blue-900/30 to-purple-900/30 text-white"
+                              : "text-gray-400 hover:bg-gray-800 hover:text-gray-300"
+                          }`}
+                        >
+                          <span
+                            className={`mr-3 ${
+                              activeSubTab === item.id
+                                ? "text-blue-400"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {item.icon}
+                          </span>
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </nav>
               </div>
             </div>
@@ -713,460 +1053,176 @@ Document: ${truncatedContent}
 
             {/* Main content area */}
             <div className="flex-1 overflow-auto p-4 md:p-6 bg-gray-950">
-              {activeTab === "dashboard" && (
-                <div className="space-y-6">
-                  {/* Financial summary cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gray-900 border border-blue-900/30 rounded-lg p-4 shadow-md">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-gray-400 text-sm font-medium">
-                          Revenue
-                        </h3>
-                        <DollarSign className="h-5 w-5 text-green-500" />
-                      </div>
-                      <p className="text-2xl font-bold text-white">
-                        {formatCurrency(financialSummary.revenue)}
-                      </p>
-                      <p className="text-sm text-green-500 mt-2 flex items-center">
-                        <ArrowUpRight className="h-4 w-4 mr-1" />
-                        <span>12% from last month</span>
-                      </p>
-                    </div>
-
-                    <div className="bg-gray-900 border border-blue-900/30 rounded-lg p-4 shadow-md">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-gray-400 text-sm font-medium">
-                          Expenses
-                        </h3>
-                        <Wallet className="h-5 w-5 text-red-500" />
-                      </div>
-                      <p className="text-2xl font-bold text-white">
-                        {formatCurrency(financialSummary.expenses)}
-                      </p>
-                      <p className="text-sm text-red-500 mt-2 flex items-center">
-                        <ArrowUpRight className="h-4 w-4 mr-1" />
-                        <span>8% from last month</span>
-                      </p>
-                    </div>
-
-                    <div className="bg-gray-900 border border-blue-900/30 rounded-lg p-4 shadow-md">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-gray-400 text-sm font-medium">
-                          Profit
-                        </h3>
-                        <PieChart className="h-5 w-5 text-blue-500" />
-                      </div>
-                      <p className="text-2xl font-bold text-white">
-                        {formatCurrency(financialSummary.profit)}
-                      </p>
-                      <p className="text-sm text-blue-500 mt-2 flex items-center">
-                        <ArrowUpRight className="h-4 w-4 mr-1" />
-                        <span>5% from last month</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Recent transactions */}
-                  <div className="bg-gray-900 border border-blue-900/30 rounded-lg shadow-md">
-                    <div className="p-4 border-b border-blue-900/30">
-                      <h2 className="text-lg font-medium text-white">
-                        Recent Transactions
-                      </h2>
-                    </div>
-                    <div className="p-4">
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                              <th className="px-4 py-2">Date</th>
-                              <th className="px-4 py-2">Description</th>
-                              <th className="px-4 py-2 text-right">Amount</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-800">
-                            {recentTransactions.map((transaction) => (
-                              <tr key={transaction.id}>
-                                <td className="px-4 py-3 text-sm text-gray-300">
-                                  {formatDate(transaction.date)}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-300">
-                                  {transaction.description}
-                                </td>
-                                <td
-                                  className={`px-4 py-3 text-sm text-right ${
-                                    transaction.type === "income"
-                                      ? "text-green-500"
-                                      : "text-red-500"
-                                  }`}
-                                >
-                                  {transaction.type === "income" ? "+" : "-"}
-                                  {formatCurrency(transaction.amount)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Upcoming deadlines */}
-                  <div className="bg-gray-900 border border-blue-900/30 rounded-lg shadow-md">
-                    <div className="p-4 border-b border-blue-900/30">
-                      <h2 className="text-lg font-medium text-white">
-                        Upcoming Deadlines
-                      </h2>
-                    </div>
-                    <div className="p-4">
-                      <ul className="divide-y divide-gray-800">
-                        {upcomingDeadlines.map((deadline) => (
-                          <li
-                            key={deadline.id}
-                            className="py-3 flex items-center"
-                          >
-                            <div
-                              className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${
-                                deadline.type === "tax"
-                                  ? "bg-red-900/30"
-                                  : deadline.type === "bill"
-                                  ? "bg-yellow-900/30"
-                                  : "bg-blue-900/30"
-                              }`}
-                            >
-                              {deadline.type === "tax" ? (
-                                <Receipt className="h-5 w-5 text-red-500" />
-                              ) : deadline.type === "bill" ? (
-                                <CreditCard className="h-5 w-5 text-yellow-500" />
-                              ) : (
-                                <FileText className="h-5 w-5 text-blue-500" />
-                              )}
-                            </div>
-                            <div className="ml-4 flex-1">
-                              <p className="text-sm font-medium text-white">
-                                {deadline.description}
-                              </p>
-                              <p className="text-xs text-gray-400">
-                                {formatDate(deadline.date)}
-                              </p>
-                            </div>
-                            <button className="ml-2 px-3 py-1 text-xs font-medium rounded-md bg-gray-800 text-gray-300 hover:bg-gray-700">
-                              Remind
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "documents" && (
-                <div className="space-y-6">
-                  {/* Upload area */}
-                  <div
-                    className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed ${
-                      dragActive
-                        ? "border-blue-500 bg-gray-800/50"
-                        : "border-gray-700"
-                    } bg-gray-900 p-10 shadow-md transition-colors`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                  >
-                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-900/30">
-                      <Upload className="h-10 w-10 text-blue-400" />
-                    </div>
-                    <p className="mb-2 text-xl font-medium text-white">
-                      Drag and drop your files here
-                    </p>
-                    <p className="mb-6 text-sm text-gray-400">
-                      or click to browse
-                    </p>
-                    <input
-                      type="file"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="fileInput"
+              {/* Import the components */}
+              {activeMainCategory === "accountant" && (
+                <>
+                  {activeSubTab === "data-input" && (
+                    <DataInput
+                      onFileUpload={handleFileUpload}
+                      onDragEnter={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDragOver={handleDrag}
+                      onDrop={handleDrop}
+                      dragActive={dragActive}
+                      files={files}
+                      isLoading={isLoading}
+                      handleFileDownload={handleFileDownload}
+                      handleFileProcessing={handleFileProcessing}
+                      handleFileDelete={handleFileDelete}
+                      getFileIcon={getFileIcon}
+                      analyzingFile={analyzingFile}
+                      errorMessage={errorMessage}
+                      fileTransferProgress={fileTransferProgress}
+                      onSaveManualData={handleSaveManualData}
                     />
-                    <label
-                      htmlFor="fileInput"
-                      className="cursor-pointer rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 text-base font-medium text-white transition-all hover:opacity-90 focus:outline-none"
-                    >
-                      Choose File
-                    </label>
+                  )}
+
+                  {activeSubTab === "workspace" && (
+                    <Workspace
+                      files={files}
+                      handleFileDownload={handleFileDownload}
+                      handleFileProcessing={handleFileProcessing}
+                      handleFileDelete={handleFileDelete}
+                      analyzingFile={analyzingFile}
+                    />
+                  )}
+
+                  {activeSubTab === "validation" && <Validation />}
+
+                  {activeSubTab === "analysis" && <Analysis />}
+
+                  {activeSubTab === "reports" && <Reports />}
+
+                  {activeSubTab === "recommendations" && <Recommendations />}
+                </>
+              )}
+
+              {/* Advisor placeholder */}
+              {activeMainCategory === "advisor" && (
+                <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
+                  <div className="text-center">
+                    <Users className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-white mb-2">
+                      Agentic Advisor
+                    </h3>
+                    <p className="text-gray-400 max-w-md">
+                      This feature is coming soon. The Agentic Advisor will
+                      provide personalized financial advice and planning.
+                    </p>
                   </div>
+                </div>
+              )}
 
-                  {errorMessage && (
-                    <div className="flex items-center rounded-lg bg-red-900/30 border border-red-800 p-4 text-sm text-red-300 shadow-sm">
-                      <AlertCircle className="mr-3 h-5 w-5" />
-                      <span>{errorMessage}</span>
-                    </div>
-                  )}
-
-                  {fileTransferProgress && (
-                    <div className="rounded-lg bg-gray-900 border border-blue-900/30 p-6 shadow-md">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="text-base font-medium text-white">
-                          {fileTransferProgress.mode}{" "}
-                          {fileTransferProgress.fileName}
-                        </span>
-                        <span className="text-base font-medium text-blue-400">
-                          {fileTransferProgress.progress}%
-                        </span>
-                      </div>
-                      <div className="h-2.5 w-full rounded-full bg-gray-800">
-                        <div
-                          className="h-2.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-300"
-                          style={{ width: `${fileTransferProgress.progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-                    <h2 className="mb-6 text-xl font-bold text-white">
-                      Your Documents
-                    </h2>
-
-                    {isLoading ? (
-                      <div className="py-12 text-center">
-                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-900 border-t-blue-500"></div>
-                        <p className="mt-4 text-gray-400">
-                          Loading your files...
+              {/* Analysis Result Modal */}
+              {analysisResult && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                  <div className="bg-gray-900 border border-blue-900/30 rounded-xl p-6 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h2 className="text-xl font-bold text-white">
+                          {analysisResult.fileName} Analysis
+                        </h2>
+                        <p className="text-sm text-blue-400 mt-1">
+                          Powered by Gemini AI
                         </p>
                       </div>
-                    ) : files.length === 0 ? (
-                      <div className="py-16 text-center">
-                        <FileText className="mx-auto mb-4 h-12 w-12 text-gray-600" />
-                        <p className="text-lg text-gray-400">
-                          You have no documents yet. Upload some to get started!
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-800">
-                        {files.map((file) => (
-                          <div
-                            key={file.name}
-                            className="flex flex-col items-start justify-between gap-4 py-4 sm:flex-row sm:items-center"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800">
-                                {getFileIcon(file.name)}
-                              </div>
-                              <span className="text-base font-medium text-white">
-                                {file.name}
-                              </span>
-                            </div>
-                            <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                              <button
-                                onClick={() => handleFileDownload(file.name)}
-                                className="flex flex-1 items-center justify-center rounded-lg bg-blue-900/30 px-4 py-2 text-sm font-medium text-blue-400 transition-colors hover:bg-blue-900/50 sm:flex-initial"
-                              >
-                                <Download className="mr-2 h-4 w-4" />
-                                Download
-                              </button>
-                              <button
-                                onClick={() => handleFileProcessing(file.name)}
-                                disabled={analyzingFile === file.name}
-                                className={`flex flex-1 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors sm:flex-initial ${
-                                  analyzingFile === file.name
-                                    ? "bg-gray-800 text-gray-500 cursor-not-allowed"
-                                    : "bg-blue-900/30 text-blue-400 hover:bg-blue-900/50"
-                                }`}
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                {analyzingFile === file.name
-                                  ? "Processing..."
-                                  : "Process File"}
-                              </button>
-                              <button
-                                onClick={() => handleFileDelete(file.name)}
-                                className="flex flex-1 items-center justify-center rounded-lg bg-red-900/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-900/50 sm:flex-initial"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {analysisResult && (
-                    <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <h2 className="text-xl font-bold text-white">
-                            {analysisResult.fileName} Analysis
-                          </h2>
-                          <p className="text-sm text-blue-400 mt-1">
-                            Powered by Gemini AI
-                          </p>
-                        </div>
-                        <button
-                          onClick={closeAnalysis}
-                          className="p-1 rounded-full hover:bg-gray-800"
-                        >
-                          <X size={18} className="text-gray-400" />
-                        </button>
-                      </div>
-                      <div className="border-t border-gray-800 my-2 pt-4"></div>
-                      <div className="prose prose-invert max-w-none">
-                        <div
-                          className="bg-gray-800 p-4 rounded-lg text-gray-300 overflow-y-auto"
-                          style={{ maxHeight: "500px" }}
-                        >
-                          {/* Format the content with Markdown-like rendering */}
-                          {analysisResult.content
-                            .split("\n")
-                            .map((line, index) => {
-                              // Format headings
-                              if (line.startsWith("# ")) {
-                                return (
-                                  <h1
-                                    key={index}
-                                    className="text-xl font-bold text-white mt-4 mb-2"
-                                  >
-                                    {line.substring(2)}
-                                  </h1>
-                                );
-                              } else if (line.startsWith("## ")) {
-                                return (
-                                  <h2
-                                    key={index}
-                                    className="text-lg font-bold text-white mt-3 mb-2"
-                                  >
-                                    {line.substring(3)}
-                                  </h2>
-                                );
-                              } else if (line.startsWith("### ")) {
-                                return (
-                                  <h3
-                                    key={index}
-                                    className="text-md font-bold text-white mt-2 mb-1"
-                                  >
-                                    {line.substring(4)}
-                                  </h3>
-                                );
-                              }
-                              // Format lists
-                              else if (line.match(/^\d+\.\s/)) {
-                                return (
-                                  <div key={index} className="ml-4 my-1">
-                                    {line}
-                                  </div>
-                                );
-                              } else if (line.match(/^-\s/)) {
-                                return (
-                                  <div key={index} className="ml-4 my-1">
-                                    {line}
-                                  </div>
-                                );
-                              } else if (line.match(/^\*\s/)) {
-                                return (
-                                  <div key={index} className="ml-4 my-1">
-                                    {line}
-                                  </div>
-                                );
-                              }
-                              // Format empty lines
-                              else if (line.trim() === "") {
-                                return <div key={index} className="h-2"></div>;
-                              }
-                              // Default paragraph
-                              else {
-                                return (
-                                  <div key={index} className="my-1">
-                                    {line}
-                                  </div>
-                                );
-                              }
-                            })}
-                        </div>
-                      </div>
-                      <div className="mt-4 flex justify-end">
-                        <button
-                          onClick={() => {
-                            // Create a blob and download the analysis as a text file
-                            const blob = new Blob([analysisResult.content], {
-                              type: "text/plain",
-                            });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement("a");
-                            link.href = url;
-                            link.download = `${analysisResult.fileName}-analysis.txt`;
-                            link.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          className="px-3 py-2 text-sm font-medium rounded-md bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 transition-colors"
-                        >
-                          Download Analysis
-                        </button>
+                      <button
+                        onClick={closeAnalysis}
+                        className="p-1 rounded-full hover:bg-gray-800"
+                      >
+                        <ChevronRight size={18} className="text-gray-400" />
+                      </button>
+                    </div>
+                    <div className="border-t border-gray-800 my-2 pt-4"></div>
+                    <div className="prose prose-invert max-w-none flex-1 overflow-auto">
+                      <div className="bg-gray-800 p-4 rounded-lg text-gray-300">
+                        {/* Format the content with Markdown-like rendering */}
+                        {analysisResult.content
+                          .split("\n")
+                          .map((line, index) => {
+                            // Format headings
+                            if (line.startsWith("# ")) {
+                              return (
+                                <h1
+                                  key={index}
+                                  className="text-xl font-bold text-white mt-4 mb-2"
+                                >
+                                  {line.substring(2)}
+                                </h1>
+                              );
+                            } else if (line.startsWith("## ")) {
+                              return (
+                                <h2
+                                  key={index}
+                                  className="text-lg font-bold text-white mt-3 mb-2"
+                                >
+                                  {line.substring(3)}
+                                </h2>
+                              );
+                            } else if (line.startsWith("### ")) {
+                              return (
+                                <h3
+                                  key={index}
+                                  className="text-md font-bold text-white mt-2 mb-1"
+                                >
+                                  {line.substring(4)}
+                                </h3>
+                              );
+                            }
+                            // Format lists
+                            else if (line.match(/^\d+\.\s/)) {
+                              return (
+                                <div key={index} className="ml-4 my-1">
+                                  {line}
+                                </div>
+                              );
+                            } else if (line.match(/^-\s/)) {
+                              return (
+                                <div key={index} className="ml-4 my-1">
+                                  {line}
+                                </div>
+                              );
+                            } else if (line.match(/^\*\s/)) {
+                              return (
+                                <div key={index} className="ml-4 my-1">
+                                  {line}
+                                </div>
+                              );
+                            }
+                            // Format empty lines
+                            else if (line.trim() === "") {
+                              return <div key={index} className="h-2"></div>;
+                            }
+                            // Default paragraph
+                            else {
+                              return (
+                                <div key={index} className="my-1">
+                                  {line}
+                                </div>
+                              );
+                            }
+                          })}
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Placeholder for other tabs */}
-              {activeTab === "track" && (
-                <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
-                  <div className="text-center">
-                    <Calculator className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-medium text-white mb-2">
-                      Track Module
-                    </h3>
-                    <p className="text-gray-400 max-w-md">
-                      This module will help you track transactions and generate
-                      financial statements.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "audit" && (
-                <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
-                  <div className="text-center">
-                    <ClipboardCheck className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-medium text-white mb-2">
-                      Audit Module
-                    </h3>
-                    <p className="text-gray-400 max-w-md">
-                      This module will help you audit your financial data and
-                      ensure compliance.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "estimate" && (
-                <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
-                  <div className="text-center">
-                    <PieChart className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-medium text-white mb-2">
-                      Estimate Module
-                    </h3>
-                    <p className="text-gray-400 max-w-md">
-                      This module will help you forecast cash flow and compare
-                      budget vs actual data.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "independent" && (
-                <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
-                  <div className="text-center">
-                    <FileText className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-medium text-white mb-2">
-                      Independent Module
-                    </h3>
-                    <p className="text-gray-400 max-w-md">
-                      This module will help you generate journal entries and
-                      answer accounting questions.
-                    </p>
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={() => {
+                          // Create a blob and download the analysis as a text file
+                          const blob = new Blob([analysisResult.content], {
+                            type: "text/plain",
+                          });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `${analysisResult.fileName}-analysis.txt`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="px-3 py-2 text-sm font-medium rounded-md bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 transition-colors"
+                      >
+                        Download Analysis
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
