@@ -13,6 +13,7 @@ import {
   FileText as FileTextIcon,
   File,
 } from "lucide-react";
+import CSVPreview from "./CSVPreview";
 
 const FilePreview = ({ file, onClose, onDownload }) => {
   const [scale, setScale] = useState(1);
@@ -25,6 +26,8 @@ const FilePreview = ({ file, onClose, onDownload }) => {
 
   useEffect(() => {
     if (file) {
+      console.log("FilePreview: File object received:", file);
+
       // Handle loading state
       if (file.loading) {
         setLoading(true);
@@ -34,6 +37,7 @@ const FilePreview = ({ file, onClose, onDownload }) => {
 
       // Handle placeholder case (when we don't have the actual file data)
       if (file.isPreviewPlaceholder) {
+        console.log("FilePreview: Using placeholder for", file.name);
         setFileType(file.type || "");
         setLoading(false);
         return;
@@ -41,19 +45,31 @@ const FilePreview = ({ file, onClose, onDownload }) => {
 
       // Check if we have a blob property (from our custom fetch)
       if (file.blob && file.blob instanceof Blob) {
+        console.log(
+          "FilePreview: Creating URL from blob for",
+          file.name,
+          file.blob.type,
+          file.blob.size
+        );
+
         // Create object URL for the blob
         const url = URL.createObjectURL(file.blob);
+        console.log("FilePreview: Created URL:", url);
+
         setPreviewUrl(url);
         setFileType(file.type || file.name.split(".").pop().toLowerCase());
         setLoading(false);
 
         // Clean up URL when component unmounts
         return () => {
+          console.log("FilePreview: Cleaning up URL:", url);
           URL.revokeObjectURL(url);
         };
       }
       // Check if file itself is a Blob or File object
       else if (file instanceof Blob || file instanceof File) {
+        console.log("FilePreview: File is a Blob/File object");
+
         // Create object URL for the file
         const url = URL.createObjectURL(file);
         setPreviewUrl(url);
@@ -65,6 +81,10 @@ const FilePreview = ({ file, onClose, onDownload }) => {
           URL.revokeObjectURL(url);
         };
       } else {
+        console.log(
+          "FilePreview: File is not a Blob or doesn't have a blob property:",
+          file
+        );
         // If file is not a Blob (just a metadata object), we need to fetch the actual file data
         setLoading(false);
         setError("Preview not available. Please download the file to view it.");
@@ -252,6 +272,50 @@ const FilePreview = ({ file, onClose, onDownload }) => {
         );
 
       case "csv":
+        return (
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center p-2 bg-gray-800 border-b border-gray-700">
+              <span className="text-sm text-gray-300">CSV Preview</span>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-900 p-4">
+              {previewUrl ? (
+                <div
+                  className="bg-white rounded overflow-auto"
+                  style={{ maxHeight: "calc(80vh - 100px)" }}
+                >
+                  <CSVPreview url={previewUrl} />
+                </div>
+              ) : (
+                <div className="bg-gray-800 rounded p-4 text-gray-300 flex flex-col items-center justify-center h-full">
+                  <div className="bg-blue-900/20 p-6 rounded-lg mb-4">
+                    <FileSpreadsheet
+                      size={48}
+                      className="text-blue-400 mx-auto mb-4"
+                    />
+                  </div>
+                  <h3 className="text-xl font-medium text-white mb-4">
+                    CSV Preview
+                  </h3>
+                  <p className="text-center mb-6 max-w-md">
+                    {loading
+                      ? "Loading CSV data..."
+                      : "Unable to load CSV data. Please try downloading the file instead."}
+                  </p>
+                  {!loading && (
+                    <button
+                      onClick={onDownload}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center"
+                    >
+                      <Download size={16} className="mr-2" />
+                      Download {file.name}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       case "xlsx":
       case "xls":
         return (
@@ -262,7 +326,8 @@ const FilePreview = ({ file, onClose, onDownload }) => {
             <div className="flex-1 overflow-auto bg-gray-900 p-4">
               <div className="bg-gray-800 rounded p-4 text-gray-300">
                 <p className="mb-4">
-                  Spreadsheet preview is not available directly in the browser.
+                  Excel spreadsheet preview is not available directly in the
+                  browser.
                 </p>
                 <p>
                   Please download the file to view it in your preferred

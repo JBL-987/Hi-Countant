@@ -530,10 +530,24 @@ Document: ${truncatedContent}
         }
       }
 
-      const data = new Blob(chunks, { type: fileType });
+      // Create a blob from the chunks
+      let mimeType = fileType;
+
+      // Set appropriate MIME type for CSV files
+      if (
+        name.toLowerCase().endsWith(".csv") &&
+        (!fileType || fileType === "")
+      ) {
+        mimeType = "text/csv";
+      }
+
+      console.log(`Creating blob for ${name} with type: ${mimeType}`);
+      const data = new Blob(chunks, { type: mimeType });
+      console.log(`Created blob: size=${data.size}, type=${data.type}`);
 
       // If this is for preview, return the blob instead of triggering a download
       if (forPreview) {
+        console.log(`Returning blob for preview: ${name}`);
         return data;
       }
 

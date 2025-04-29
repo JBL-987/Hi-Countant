@@ -437,24 +437,39 @@ const Workspace = ({
       // Since we don't have direct access to the actor here, we'll use the handleFileDownload function
       // But we need to modify our approach to get the actual file data
 
-      // For now, let's use a simpler approach - we'll call handleFileDownload directly
-      // but intercept the download process
-
-      // First, let's check if we're dealing with a PDF file
+      // First, let's check the file extension
       const fileExtension = file.name.split(".").pop().toLowerCase();
 
-      if (["pdf", "jpg", "jpeg", "png", "gif"].includes(fileExtension)) {
+      // List of file types we can preview
+      const previewableTypes = [
+        "pdf",
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "csv",
+        "txt",
+      ];
+
+      if (previewableTypes.includes(fileExtension)) {
         // For these file types, we'll try to get the actual file data
         // We'll use the handleFileDownload function but modify it to not trigger a download
+        console.log(`Fetching ${file.name} for preview...`);
+
         handleFileDownload(file.name, true)
           .then((fileBlob) => {
             if (fileBlob) {
+              console.log(
+                `Successfully fetched blob for ${file.name}`,
+                fileBlob
+              );
               setPreviewFile({
                 name: file.name,
                 blob: fileBlob,
                 type: fileExtension,
               });
             } else {
+              console.log(`No blob returned for ${file.name}`);
               // Fallback to placeholder if we couldn't get the file data
               setPreviewFile({
                 name: file.name,
@@ -472,6 +487,7 @@ const Workspace = ({
             });
           });
       } else {
+        console.log(`File type ${fileExtension} is not previewable`);
         // For other file types, just show the placeholder
         setPreviewFile({
           name: file.name,
