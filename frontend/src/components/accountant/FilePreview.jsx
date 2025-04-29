@@ -116,6 +116,12 @@ const FilePreview = ({ file, onClose, onDownload }) => {
     setRotation((prevRotation) => (prevRotation + 90) % 360);
   };
 
+  // Reset view function
+  const resetView = () => {
+    setScale(1);
+    setRotation(0);
+  };
+
   // Toggle fullscreen
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
@@ -236,6 +242,7 @@ const FilePreview = ({ file, onClose, onDownload }) => {
                 <button
                   onClick={zoomOut}
                   className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
+                  title="Zoom Out"
                 >
                   <span className="text-lg font-bold">-</span>
                 </button>
@@ -245,29 +252,55 @@ const FilePreview = ({ file, onClose, onDownload }) => {
                 <button
                   onClick={zoomIn}
                   className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
+                  title="Zoom In"
                 >
                   <span className="text-lg font-bold">+</span>
                 </button>
                 <button
                   onClick={rotateClockwise}
                   className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
+                  title="Rotate"
                 >
                   <RotateCw size={16} />
                 </button>
+                <button
+                  onClick={resetView}
+                  className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
+                  title="Reset View"
+                >
+                  <span className="text-xs font-bold">100%</span>
+                </button>
+                <button
+                  onClick={onDownload}
+                  className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
+                  title="Download"
+                >
+                  <Download size={16} />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
+                  title="Close"
+                >
+                  <X size={16} />
+                </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-900 p-4">
-              <img
-                src={previewUrl}
-                alt={file.name}
-                style={{
-                  transform: `scale(${scale}) rotate(${rotation}deg)`,
-                  transformOrigin: "center center",
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                }}
-                className="transition-transform duration-200"
-              />
+            <div className="flex-1 bg-gray-900 p-4 file-preview-content">
+              <div className="image-preview-container">
+                <img
+                  src={previewUrl}
+                  alt={file.name}
+                  style={{
+                    transform: `scale(${scale}) rotate(${rotation}deg)`,
+                    transformOrigin: "center center",
+                    maxWidth: scale <= 1 ? "100%" : "none",
+                    maxHeight: scale <= 1 ? "100%" : "none",
+                    objectFit: "contain",
+                  }}
+                  className="transition-transform duration-200"
+                />
+              </div>
             </div>
           </div>
         );
@@ -454,6 +487,51 @@ const FilePreview = ({ file, onClose, onDownload }) => {
     }
   };
 
+  // Add CSS for image preview
+  React.useEffect(() => {
+    // Add CSS for better image preview scrolling
+    const style = document.createElement("style");
+    style.textContent = `
+      .file-preview-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .file-preview-content {
+        flex: 1;
+        position: relative;
+        overflow: auto;
+      }
+
+      .image-preview-container {
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .image-preview-container img {
+        transition: transform 0.2s ease;
+      }
+
+      /* When zoomed in, allow scrolling */
+      .zoomed-in {
+        overflow: auto !important;
+      }
+
+      .zoomed-in .image-preview-container {
+        min-width: max-content;
+        min-height: max-content;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <div
       className={`fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 ${
@@ -498,7 +576,9 @@ const FilePreview = ({ file, onClose, onDownload }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">{renderPreview()}</div>
+        <div className={`flex-1 overflow-auto ${scale > 1 ? "zoomed-in" : ""}`}>
+          {renderPreview()}
+        </div>
       </div>
     </div>
   );
