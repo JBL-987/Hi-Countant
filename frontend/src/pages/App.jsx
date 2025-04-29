@@ -203,6 +203,91 @@ Document: ${truncatedContent}
     }
   }
 
+  // Function to process binary files (PDFs, images, etc.) using Gemini's multimodal capabilities
+  async function processDocumentWithBinaryData(
+    base64Data,
+    fileName,
+    fileTypeContext,
+    mimeType
+  ) {
+    try {
+      setAnalyzingFile(fileName);
+
+      Swal.fire({
+        title: "Processing document...",
+        text: `Analyzing ${fileName} with Gemini AI`,
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      // Construct the API request with multimodal content (text + image/PDF)
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `You are Hi! Countant, an AI accountant assistant. Please analyze this ${fileTypeContext} file and provide:\n\n1. A summary of key financial information\n2. Any important dates, amounts, or transactions\n3. Accounting implications or recommendations\n4. Potential tax considerations\n5. Any anomalies or items that require attention\n\nFile name: ${fileName}`,
+                  },
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: base64Data,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.2,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          `Gemini API error: ${errorData.error?.message || response.statusText}`
+        );
+      }
+
+      const result = await response.json();
+      Swal.close();
+
+      // Extract the content from Gemini's response format
+      const content = result.candidates[0].content.parts[0].text;
+
+      setAnalysisResult({
+        fileName: fileName,
+        content: content,
+      });
+
+      return result;
+    } catch (error) {
+      Swal.close();
+      Swal.fire({
+        icon: "error",
+        title: "Processing Failed",
+        text: `Failed to process ${fileName}: ${error.message}`,
+      });
+      console.error("AI processing failed:", error);
+      setAnalyzingFile("");
+      return null;
+    }
+  }
+
   async function loadFiles() {
     setIsLoading(true);
     try {
@@ -413,42 +498,39 @@ Document: ${truncatedContent}
         name.endsWith(".svg");
 
       if (isTextBased || isSpreadsheet || isDocument || isPDF || isImage) {
-        const reader = new FileReader();
+        // For text-based files, read as text
+        if (isTextBased) {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const fileContent = e.target.result;
+            const contentWithContext = `This is a text file.\n\nFile name: ${name}\n\nContent:\n${fileContent}`;
+            await processDocumentWithAI(contentWithContext, name);
+          };
+          reader.readAsText(data);
+        }
+        // For binary files (PDFs, images, etc.), convert to base64 and send to Gemini
+        else {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const base64Content = e.target.result.split(",")[1]; // Remove the data URL prefix
 
-        reader.onload = async (e) => {
-          let fileContent = e.target.result;
+            // Determine file type for context
+            let fileTypeContext = "";
+            if (isSpreadsheet) fileTypeContext = "spreadsheet";
+            if (isDocument) fileTypeContext = "document";
+            if (isPDF) fileTypeContext = "PDF";
+            if (isImage) fileTypeContext = "image";
 
-          // Add context about the file type to help Gemini process it better
-          let fileTypeContext = "";
-          if (isTextBased) fileTypeContext = "This is a text file.";
-          if (isSpreadsheet) fileTypeContext = "This is a spreadsheet file.";
-          if (isDocument) fileTypeContext = "This is a document file.";
-          if (isPDF) fileTypeContext = "This is a PDF file.";
-          if (isImage)
-            fileTypeContext =
-              "This is an image file (text content may be limited).";
-
-          // For binary files that were read as text, we might get garbled content
-          // Add a note about this to the AI
-          if (
-            ((isSpreadsheet || isDocument || isPDF || isImage) &&
-              fileContent.includes("�")) ||
-            fileContent.length > 100000
-          ) {
-            fileContent = `[This file appears to be in binary format and couldn't be fully parsed as text. Here's a sample of the content that could be extracted:]\n\n${fileContent.substring(
-              0,
-              5000
-            )}`;
-          }
-
-          // Combine the context with the content
-          const contentWithContext = `${fileTypeContext}\n\nFile name: ${name}\n\nContent:\n${fileContent}`;
-
-          await processDocumentWithAI(contentWithContext, name);
-        };
-
-        // Always try to read as text first - Gemini works best with text
-        reader.readAsText(data);
+            // Send the binary data to Gemini for processing
+            await processDocumentWithBinaryData(
+              base64Content,
+              name,
+              fileTypeContext,
+              fileType
+            );
+          };
+          reader.readAsDataURL(data);
+        }
       } else {
         Swal.close();
         Swal.fire({
