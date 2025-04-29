@@ -451,6 +451,8 @@ const Workspace = ({
         "txt",
         "xlsx",
         "xls",
+        "docx",
+        "doc",
       ];
 
       if (previewableTypes.includes(fileExtension)) {

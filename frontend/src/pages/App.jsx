@@ -542,6 +542,11 @@ Document: ${truncatedContent}
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         } else if (name.toLowerCase().endsWith(".xls")) {
           mimeType = "application/vnd.ms-excel";
+        } else if (name.toLowerCase().endsWith(".docx")) {
+          mimeType =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        } else if (name.toLowerCase().endsWith(".doc")) {
+          mimeType = "application/msword";
         }
       }
 
