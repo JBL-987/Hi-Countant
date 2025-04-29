@@ -494,12 +494,15 @@ Document: ${truncatedContent}
     }
   }
 
-  async function handleFileDownload(name) {
-    setFileTransferProgress({
-      mode: "Downloading",
-      fileName: name,
-      progress: 0,
-    });
+  async function handleFileDownload(name, forPreview = false) {
+    if (!forPreview) {
+      setFileTransferProgress({
+        mode: "Downloading",
+        fileName: name,
+        progress: 0,
+      });
+    }
+
     try {
       const totalChunks = Number(await actor.getTotalChunks(name));
       const fileTypeResult = await actor.getFileType(name);
@@ -519,13 +522,22 @@ Document: ${truncatedContent}
           throw new Error(`Failed to retrieve chunk ${i}`);
         }
 
-        setFileTransferProgress((prev) => ({
-          ...prev,
-          progress: Math.floor(((i + 1) / totalChunks) * 100),
-        }));
+        if (!forPreview) {
+          setFileTransferProgress((prev) => ({
+            ...prev,
+            progress: Math.floor(((i + 1) / totalChunks) * 100),
+          }));
+        }
       }
 
       const data = new Blob(chunks, { type: fileType });
+
+      // If this is for preview, return the blob instead of triggering a download
+      if (forPreview) {
+        return data;
+      }
+
+      // Otherwise, proceed with download
       const url = URL.createObjectURL(data);
       const link = document.createElement("a");
       link.href = url;
@@ -540,16 +552,23 @@ Document: ${truncatedContent}
         timer: 2000,
         timerProgressBar: true,
       });
+
+      return null; // Return null for normal downloads
     } catch (error) {
       console.error("Download failed:", error);
-      setErrorMessage(`Failed to download ${name}: ${error.message}`);
-      Swal.fire({
-        icon: "error",
-        title: "Download Failed",
-        text: `Failed to download ${name}: ${error.message}`,
-      });
+      if (!forPreview) {
+        setErrorMessage(`Failed to download ${name}: ${error.message}`);
+        Swal.fire({
+          icon: "error",
+          title: "Download Failed",
+          text: `Failed to download ${name}: ${error.message}`,
+        });
+      }
+      return null;
     } finally {
-      setFileTransferProgress(null);
+      if (!forPreview) {
+        setFileTransferProgress(null);
+      }
     }
   }
 

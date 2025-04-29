@@ -13,7 +13,9 @@ import {
   ClipboardCheck,
   MoreHorizontal,
   MoveHorizontal,
+  Eye,
 } from "lucide-react";
+import FilePreview from "./FilePreview";
 
 const Workspace = ({
   files,
@@ -318,6 +320,9 @@ const Workspace = ({
     y: 0,
   });
 
+  // State for file preview
+  const [previewFile, setPreviewFile] = useState(null);
+
   // Handle right-click on folder or file
   const handleContextMenu = (e, type, item, folder = null) => {
     e.preventDefault();
@@ -418,6 +423,70 @@ const Workspace = ({
     setDraggedFileFolder(null);
     setDragOverFolder(null);
     dragCounter.current = 0;
+  };
+
+  // File preview handlers
+  const openFilePreview = async (file) => {
+    try {
+      // Show loading indicator
+      setPreviewFile({ name: file.name, loading: true });
+
+      // We need to fetch the actual file data from the backend
+      // This is similar to the handleFileDownload function in App.jsx
+
+      // Since we don't have direct access to the actor here, we'll use the handleFileDownload function
+      // But we need to modify our approach to get the actual file data
+
+      // For now, let's use a simpler approach - we'll call handleFileDownload directly
+      // but intercept the download process
+
+      // First, let's check if we're dealing with a PDF file
+      const fileExtension = file.name.split(".").pop().toLowerCase();
+
+      if (["pdf", "jpg", "jpeg", "png", "gif"].includes(fileExtension)) {
+        // For these file types, we'll try to get the actual file data
+        // We'll use the handleFileDownload function but modify it to not trigger a download
+        handleFileDownload(file.name, true)
+          .then((fileBlob) => {
+            if (fileBlob) {
+              setPreviewFile({
+                name: file.name,
+                blob: fileBlob,
+                type: fileExtension,
+              });
+            } else {
+              // Fallback to placeholder if we couldn't get the file data
+              setPreviewFile({
+                name: file.name,
+                isPreviewPlaceholder: true,
+                type: fileExtension,
+              });
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching file for preview:", error);
+            setPreviewFile({
+              name: file.name,
+              isPreviewPlaceholder: true,
+              type: fileExtension,
+            });
+          });
+      } else {
+        // For other file types, just show the placeholder
+        setPreviewFile({
+          name: file.name,
+          isPreviewPlaceholder: true,
+          type: fileExtension,
+        });
+      }
+    } catch (error) {
+      console.error("Error preparing file preview:", error);
+      setPreviewFile(null);
+    }
+  };
+
+  const closeFilePreview = () => {
+    setPreviewFile(null);
   };
 
   return (
@@ -598,6 +667,16 @@ const Workspace = ({
 
                         <div className="flex items-center space-x-2">
                           <button
+                            className="text-gray-400 hover:text-green-400 p-1 rounded-full hover:bg-gray-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openFilePreview(file);
+                            }}
+                            title="Preview"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
                             className="text-gray-400 hover:text-blue-400 p-1 rounded-full hover:bg-gray-600"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -670,6 +749,15 @@ const Workspace = ({
           {contextMenu.type === "file" &&
             renderFileMenu(contextMenu.item, contextMenu.folder)}
         </div>
+      )}
+
+      {/* File Preview */}
+      {previewFile && (
+        <FilePreview
+          file={previewFile}
+          onClose={closeFilePreview}
+          onDownload={() => handleFileDownload(previewFile.name)}
+        />
       )}
     </div>
   );
