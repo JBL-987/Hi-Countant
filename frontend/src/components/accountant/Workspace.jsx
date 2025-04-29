@@ -449,6 +449,8 @@ const Workspace = ({
         "gif",
         "csv",
         "txt",
+        "xlsx",
+        "xls",
       ];
 
       if (previewableTypes.includes(fileExtension)) {

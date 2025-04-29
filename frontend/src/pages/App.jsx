@@ -533,12 +533,16 @@ Document: ${truncatedContent}
       // Create a blob from the chunks
       let mimeType = fileType;
 
-      // Set appropriate MIME type for CSV files
-      if (
-        name.toLowerCase().endsWith(".csv") &&
-        (!fileType || fileType === "")
-      ) {
-        mimeType = "text/csv";
+      // Set appropriate MIME types based on file extension
+      if (!fileType || fileType === "") {
+        if (name.toLowerCase().endsWith(".csv")) {
+          mimeType = "text/csv";
+        } else if (name.toLowerCase().endsWith(".xlsx")) {
+          mimeType =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        } else if (name.toLowerCase().endsWith(".xls")) {
+          mimeType = "application/vnd.ms-excel";
+        }
       }
 
       console.log(`Creating blob for ${name} with type: ${mimeType}`);

@@ -14,6 +14,7 @@ import {
   File,
 } from "lucide-react";
 import CSVPreview from "./CSVPreview";
+import ExcelPreview from "./ExcelPreview";
 
 const FilePreview = ({ file, onClose, onDownload }) => {
   const [scale, setScale] = useState(1);
@@ -321,26 +322,59 @@ const FilePreview = ({ file, onClose, onDownload }) => {
         return (
           <div className="flex flex-col h-full">
             <div className="flex justify-between items-center p-2 bg-gray-800 border-b border-gray-700">
-              <span className="text-sm text-gray-300">Spreadsheet Preview</span>
-            </div>
-            <div className="flex-1 overflow-auto bg-gray-900 p-4">
-              <div className="bg-gray-800 rounded p-4 text-gray-300">
-                <p className="mb-4">
-                  Excel spreadsheet preview is not available directly in the
-                  browser.
-                </p>
-                <p>
-                  Please download the file to view it in your preferred
-                  spreadsheet application.
-                </p>
+              <span className="text-sm text-gray-300">
+                Excel Spreadsheet Preview
+              </span>
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={onDownload}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center"
+                  className="p-1 text-gray-400 hover:text-white transition-colors"
+                  title="Download Excel file"
                 >
-                  <Download size={16} className="mr-2" />
-                  Download {file.name}
+                  <Download size={16} />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-1 text-gray-400 hover:text-white transition-colors"
+                  title="Close preview"
+                >
+                  <X size={16} />
                 </button>
               </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-900 p-4">
+              {previewUrl ? (
+                <div
+                  className="bg-white rounded overflow-auto"
+                  style={{ maxHeight: "calc(80vh - 100px)" }}
+                >
+                  <ExcelPreview url={previewUrl} />
+                </div>
+              ) : (
+                <div className="bg-gray-800 rounded p-4 text-gray-300 flex flex-col items-center justify-center h-full">
+                  <div className="bg-blue-900/20 p-6 rounded-lg mb-4">
+                    <FileSpreadsheet
+                      size={48}
+                      className="text-blue-400 mx-auto mb-4"
+                    />
+                  </div>
+                  <h3 className="text-xl font-medium text-white mb-4">
+                    Excel Spreadsheet Preview
+                  </h3>
+                  <p className="text-center mb-6 max-w-md">
+                    {loading
+                      ? "Loading Excel data..."
+                      : "Excel files require specialized libraries to parse. Please download the file to view it in Excel."}
+                  </p>
+                  <button
+                    onClick={onDownload}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center"
+                  >
+                    <Download size={16} className="mr-2" />
+                    Download {file.name}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
