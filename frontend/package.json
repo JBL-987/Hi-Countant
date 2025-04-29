@@ -12,6 +12,8 @@
     "@dfinity/auth-client": "2.2.0",
     "@dfinity/candid": "2.2.0",
     "@dfinity/principal": "2.2.0",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
     "mammoth": "^1.9.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",

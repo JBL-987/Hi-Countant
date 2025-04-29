@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Receipt,
   Folder,
+  Image,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Logo from "../components/Logo";
@@ -32,6 +33,7 @@ import Recommendations from "../components/accountant/Recommendations";
 function App({ actor, isAuthenticated, login }) {
   const navigate = useNavigate();
   const [files, setFiles] = useState([]);
+  const [manualEntries, setManualEntries] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
   const [fileTransferProgress, setFileTransferProgress] = useState();
   const [isLoading, setIsLoading] = useState(true);
@@ -638,7 +640,169 @@ Document: ${truncatedContent}
     });
   }
 
-  const getFileIcon = () => {
+  // Function to handle saving manual data entries
+  async function handleSaveManualData(data) {
+    try {
+      Swal.fire({
+        title: "Generating Document...",
+        text: "Please wait while we create your transaction record",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
+      // Import the PDF generator dynamically
+      const { generateTransactionPDF } = await import("../utils/pdfGenerator");
+
+      // Generate a PDF from the transaction data
+      console.log("Generating PDF for transaction:", data);
+
+      // Make sure amount is a number
+      if (typeof data.amount === "string") {
+        data.amount = parseFloat(data.amount) || 0;
+      }
+
+      // Make sure line items have numeric amounts
+      if (data.lineItems && Array.isArray(data.lineItems)) {
+        data.lineItems = data.lineItems.map((item) => ({
+          ...item,
+          amount:
+            typeof item.amount === "string"
+              ? parseFloat(item.amount) || 0
+              : item.amount,
+        }));
+      }
+
+      const pdfBlob = generateTransactionPDF(data);
+      console.log("PDF generated successfully:", pdfBlob);
+
+      // Create a filename based on the transaction data
+      const date = new Date(data.date).toISOString().split("T")[0];
+      const type =
+        data.transactionType.charAt(0).toUpperCase() +
+        data.transactionType.slice(1);
+      const amount = parseFloat(data.amount).toFixed(2).replace(".", "_");
+      const timestamp = Date.now().toString().slice(-6); // Use last 6 digits of timestamp for uniqueness
+      const fileName = `Transaction_${date}_${type}_${amount}_${timestamp}.pdf`;
+
+      // In a real application, you would save this to the backend
+      const newEntry = {
+        id: Date.now().toString(), // Generate a unique ID
+        ...data,
+        createdAt: new Date().toISOString(),
+        fileName: fileName,
+      };
+
+      setManualEntries((prevEntries) => [...prevEntries, newEntry]);
+
+      // Upload the PDF to the backend as if it were a file
+      await uploadPdfToBackend(pdfBlob, fileName);
+
+      // Close the loading dialog
+      Swal.close();
+
+      // Show success message
+      Swal.fire({
+        icon: "success",
+        title: "Transaction Saved",
+        text: "Your transaction has been recorded and added to your documents!",
+        timer: 2000,
+        timerProgressBar: true,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Failed to save transaction:", error);
+      Swal.close();
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: `Failed to save transaction: ${error.message}`,
+      });
+      return false;
+    }
+  }
+
+  // Helper function to upload PDF to backend
+  async function uploadPdfToBackend(pdfBlob, fileName) {
+    try {
+      setFileTransferProgress({
+        mode: "Uploading",
+        fileName: fileName,
+        progress: 0,
+      });
+
+      // Convert blob to array buffer for upload
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const content = new Uint8Array(arrayBuffer);
+
+      // Use the same chunk-based upload mechanism as for regular files
+      const chunkSize = 1024 * 1024; // 1MB chunks
+      const totalChunks = Math.ceil(content.length / chunkSize);
+
+      // Check if file already exists
+      const fileExists = await actor.checkFileExists(fileName);
+      if (fileExists) {
+        // Append a unique identifier to avoid overwriting
+        const timestamp = Date.now();
+        fileName = fileName.replace(".pdf", `_${timestamp}.pdf`);
+      }
+
+      // Upload chunks
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, content.length);
+        const chunk = content.slice(start, end);
+
+        await actor.uploadFileChunk(
+          fileName,
+          chunk,
+          BigInt(i),
+          "application/pdf"
+        );
+
+        setFileTransferProgress((prev) => ({
+          ...prev,
+          progress: Math.floor(((i + 1) / totalChunks) * 100),
+        }));
+      }
+
+      // Refresh the file list
+      await loadFiles();
+      setFileTransferProgress(null);
+
+      return true;
+    } catch (error) {
+      console.error("Failed to upload PDF:", error);
+      setErrorMessage(`Failed to upload transaction record: ${error.message}`);
+      setFileTransferProgress(null);
+      throw error;
+    }
+  }
+
+  const getFileIcon = (fileName) => {
+    // Check if this is a transaction PDF (follows our naming pattern)
+    if (
+      fileName &&
+      (fileName.startsWith("Transaction_") ||
+        fileName.match(/^\d{4}-\d{2}-\d{2}_[A-Z][a-z]+/))
+    ) {
+      return <Calculator className="text-green-400" />;
+    }
+
+    // Check file extension
+    const extension = fileName?.split(".").pop()?.toLowerCase();
+
+    if (extension === "pdf") {
+      return <FileText className="text-red-400" />;
+    } else if (["jpg", "jpeg", "png", "gif"].includes(extension)) {
+      return <Image className="text-purple-400" />;
+    } else if (["xlsx", "xls", "csv"].includes(extension)) {
+      return <FileSpreadsheet className="text-blue-400" />;
+    }
+
+    // For other files, return the default icon
     return <FileText className="text-gray-400" />;
   };
 
@@ -909,6 +1073,7 @@ Document: ${truncatedContent}
                       analyzingFile={analyzingFile}
                       errorMessage={errorMessage}
                       fileTransferProgress={fileTransferProgress}
+                      onSaveManualData={handleSaveManualData}
                     />
                   )}
 
