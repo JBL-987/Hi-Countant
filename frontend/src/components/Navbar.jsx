@@ -3,20 +3,8 @@ import Swal from "sweetalert2";
 import { Menu, X } from "lucide-react";
 import Logo from "./Logo";
 
-const Navbar_Component = ({ isAuthenticated, login, logout }) => {
+const Navbar_Component = ({ isAuthenticated, logout }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const handleLogin = async () => {
-    try {
-      await login();
-    } catch (e) {
-      Swal.fire({
-        icon: "error",
-        title: "Error connecting to ICP",
-        text: "Something went wrong!",
-      });
-    }
-  };
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -64,12 +52,8 @@ const Navbar_Component = ({ isAuthenticated, login, logout }) => {
               Logout
             </button>
           ) : (
-            <button
-              onClick={handleLogin}
-              className="text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all"
-            >
-              Connect ICP
-            </button>
+            <>
+            </>
           )}
         </div>
 
@@ -103,12 +87,8 @@ const Navbar_Component = ({ isAuthenticated, login, logout }) => {
                   Logout
                 </button>
               ) : (
-                <button
-                  onClick={handleLogin}
-                  className="text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all"
-                >
-                  Connect ICP
-                </button>
+                <>
+                </>
               )}
             </div>
           </div>

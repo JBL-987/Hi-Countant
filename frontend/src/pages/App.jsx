@@ -1095,7 +1095,23 @@ Document: ${truncatedContent}
 
                   {activeSubTab === "recommendations" && <Recommendations />}
                 </>
-              )}
+              )} 
+
+              {activeMainCategory === "advisor" && (
+                <>
+                  {activeSubTab === "financial-planning" && (
+                    <FinancialPlanning
+                    />
+                  )}
+
+                  {activeSubTab === "investment" && (
+                    <Investment
+                    />
+                  )}
+
+                  {activeSubTab === "tax-strategy" && <TaxStrategy />}
+                </>
+              )}  
 
               {/* Advisor placeholder */}
               {activeMainCategory === "advisor" && (

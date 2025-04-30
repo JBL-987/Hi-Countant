@@ -175,7 +175,7 @@ function Main() {
         logout={logout}
       />
       <Routes>
-        <Route path="/" element={<Home isAuthenticated={isAuthenticated} />} />
+        <Route path="/" element={<Home isAuthenticated={isAuthenticated} login={login} />} />
         <Route
           path="/app"
           element={

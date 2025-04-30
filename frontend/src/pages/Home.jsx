@@ -10,10 +10,22 @@ import {
 } from "lucide-react";
 import Spline from "@splinetool/react-spline";
 
-export default function Home({ isAuthenticated }) {
+export default function Home({ isAuthenticated, login }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("track");
   const heroref = useRef(null);
+
+  const handleLogin = async () => {
+      try {
+        await login();
+      } catch (e) {
+        Swal.fire({
+          icon: "error",
+          title: "Error connecting to ICP",
+          text: "Something went wrong!",
+        });
+      }
+    };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -93,7 +105,9 @@ export default function Home({ isAuthenticated }) {
               Hi! Countant replaces traditional accountants with powerful AI that handles all your financial needs securely on the blockchain.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-lg font-medium hover:opacity-90 transition-all transform hover:scale-105">
+              <button
+                onClick={handleLogin}
+                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-lg font-medium hover:opacity-90 transition-all transform hover:scale-105">
                 Get Started
               </button>
               <button className="px-8 py-4 bg-transparent border-2 border-white/30 rounded-lg text-lg font-medium hover:bg-white/10 transition-all">
@@ -398,7 +412,9 @@ export default function Home({ isAuthenticated }) {
               Join thousands of businesses that have switched to Hi! Countant for
               their accounting needs.
             </p>
-            <button className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-lg font-medium hover:opacity-90 transition-all transform hover:scale-105 flex items-center mx-auto">
+            <button
+              onClick={handleLogin}
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-lg font-medium hover:opacity-90 transition-all transform hover:scale-105 flex items-center mx-auto">
               Get Started Now
               <ArrowRight className="ml-2 h-5 w-5" />
             </button>

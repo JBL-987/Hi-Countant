@@ -25,40 +25,38 @@ const Workspace = ({
   analyzingFile,
 }) => {
   // Initial folder structure based on the image
-  const [folderStructure, setFolderStructure] = useState({
-    Financial_Reports: {
-      expanded: false,
-      description:
-        "Semua laporan keuangan utama (Balance Sheet, Income Statement, dll)",
-      purpose: "Untuk stakeholder (investor, board, auditor)",
-      files: [],
-    },
-    Managerial_Reports: {
-      expanded: false,
-      description:
-        "Semua laporan untuk keperluan internal (kinerja, biaya, forecast)",
-      purpose: "Untuk CEO, manajer, decision making",
-      files: [],
-    },
-    Tax_Reports: {
-      expanded: false,
-      description: "Laporan-laporan pajak resmi untuk pemerintah",
-      purpose: "Untuk tax compliance dan pelaporan SPT",
-      files: [],
-    },
-    Compliance_Documents: {
-      expanded: false,
-      description: "Audit report, bukti patuh pajak, dokumen kontrol internal",
-      purpose: "Untuk bukti legalitas dan review eksternal",
-      files: [],
-    },
-    Uncategorized: {
-      expanded: true,
-      description: "Files that have not been categorized yet",
-      purpose: "Temporary storage for new uploads",
-      files: files || [],
-    },
-  });
+const [folderStructure, setFolderStructure] = useState({
+  Financial_Reports: {
+    expanded: false,
+    description: "All main financial reports (Balance Sheet, Income Statement, etc.)",
+    purpose: "For stakeholders (investors, board, auditors)",
+    files: [],
+  },
+  Managerial_Reports: {
+    expanded: false,
+    description: "All reports for internal use (performance, cost, forecast)",
+    purpose: "For CEO, managers, decision making",
+    files: [],
+  },
+  Tax_Reports: {
+    expanded: false,
+    description: "Official tax reports for the government",
+    purpose: "For tax compliance and SPT reporting",
+    files: [],
+  },
+  Compliance_Documents: {
+    expanded: false,
+    description: "Audit reports, proof of tax compliance, internal control documents",
+    purpose: "For legal proof and external reviews",
+    files: [],
+  },
+  Uncategorized: {
+    expanded: true,
+    description: "Files that have not been categorized yet",
+    purpose: "Temporary storage for new uploads",
+    files: files || [],
+  },
+});
 
   // Update Uncategorized folder when files prop changes
   useEffect(() => {
