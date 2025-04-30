@@ -9,6 +9,7 @@ import {
   Filter,
   ArrowUpDown,
   FileText,
+  Trash,
 } from "lucide-react";
 
 const LogTrails = ({
@@ -16,6 +17,7 @@ const LogTrails = ({
   onViewTransaction,
   onDeleteTransaction,
   onExportTransactions,
+  onDeleteAllTransactions,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("timestamp");
@@ -25,15 +27,18 @@ const LogTrails = ({
   // Filter transactions based on search term and filter type
   const filteredTransactions = transactions.filter((transaction) => {
     const matchesSearch =
-      transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.description
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
       transaction.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.sourceFile?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (transaction.reference && 
+      transaction.sourceFile
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (transaction.reference &&
         transaction.reference.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesFilter =
-      filterType === "all" ||
-      transaction.transactionType === filterType;
+      filterType === "all" || transaction.transactionType === filterType;
 
     return matchesSearch && matchesFilter;
   });
@@ -131,13 +136,25 @@ const LogTrails = ({
             </div>
           </div>
 
-          <button
-            onClick={() => onExportTransactions && onExportTransactions()}
-            className="px-3 py-2 bg-blue-900/30 text-blue-400 rounded-md hover:bg-blue-900/50 transition-colors flex items-center"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => onExportTransactions && onExportTransactions()}
+              className="px-3 py-2 bg-blue-900/30 text-blue-400 rounded-md hover:bg-blue-900/50 transition-colors flex items-center"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </button>
+
+            <button
+              onClick={() =>
+                onDeleteAllTransactions && onDeleteAllTransactions()
+              }
+              className="px-3 py-2 bg-red-900/30 text-red-400 rounded-md hover:bg-red-900/50 transition-colors flex items-center"
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete All
+            </button>
+          </div>
         </div>
       </div>
 
@@ -146,7 +163,9 @@ const LogTrails = ({
         {transactions.length === 0 ? (
           <div className="p-8 text-center">
             <Receipt className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-white mb-2">No Transactions</h3>
+            <h3 className="text-lg font-medium text-white mb-2">
+              No Transactions
+            </h3>
             <p className="text-gray-400 max-w-md mx-auto">
               Process documents to extract transactions or add manual entries.
             </p>

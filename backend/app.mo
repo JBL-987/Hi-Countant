@@ -8,6 +8,8 @@ import Nat "mo:base/Nat";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Option "mo:base/Option";
+import Float "mo:base/Float";
+import Buffer "mo:base/Buffer";
 
 persistent actor Filevault {
 
@@ -25,11 +27,49 @@ persistent actor Filevault {
     fileType : Text;
   };
 
+  // Define a data type for a transaction.
+  type Transaction = {
+    id : Text;
+    transactionType : Text;
+    amount : Float;
+    date : Text;
+    description : Text;
+    category : ?Text;
+    paymentMethod : ?Text;
+    reference : ?Text;
+    taxDeductible : Bool;
+    sourceFile : ?Text;
+    timestamp : Text;
+  };
+
   // Define a data type for storing files associated with a user principal.
   type UserFiles = HashMap.Map<Text, File>;
 
+  // Define a data type for storing transactions associated with a user principal.
+  type UserTransactions = [Transaction];
+
   // HashMap to store the user data
   private var files = HashMap.new<Principal, UserFiles>();
+
+  // HashMap to store user transactions - using 'stable' to persist across upgrades
+  private stable var stableTransactions : [(Principal, [Transaction])] = [];
+  private var transactions = HashMap.new<Principal, UserTransactions>();
+
+  // System functions for persistence
+  system func preupgrade() {
+    // Convert HashMap to array of tuples for stable storage
+    stableTransactions := [];
+    for ((principal, txs) in HashMap.entries(transactions)) {
+      stableTransactions := Array.append(stableTransactions, [(principal, txs)]);
+    };
+  };
+
+  system func postupgrade() {
+    // Restore transactions from stable storage
+    for ((principal, txs) in stableTransactions.vals()) {
+      HashMap.put(transactions, phash, principal, txs);
+    };
+  };
 
   // Return files associated with a user's principal.
   private func getUserFiles(user : Principal) : UserFiles {
@@ -122,5 +162,28 @@ persistent actor Filevault {
   // Delete a file.
   public shared (msg) func deleteFile(name : Text) : async Bool {
     Option.isSome(HashMap.remove(getUserFiles(msg.caller), thash, name));
+  };
+
+  // Get user transactions
+  private func getUserTransactions(user : Principal) : [Transaction] {
+    switch (HashMap.get(transactions, phash, user)) {
+      case null { [] };
+      case (?existingTransactions) { existingTransactions };
+    };
+  };
+
+  // Save transactions for a user
+  public shared (msg) func saveTransactions(userTransactions : [Transaction]) : async () {
+    let _ = HashMap.put(transactions, phash, msg.caller, userTransactions);
+  };
+
+  // Get all transactions for a user
+  public shared (msg) func getTransactions() : async [Transaction] {
+    getUserTransactions(msg.caller);
+  };
+
+  // Delete all transactions for a user
+  public shared (msg) func deleteAllTransactions() : async () {
+    let _ = HashMap.put(transactions, phash, msg.caller, []);
   };
 };
