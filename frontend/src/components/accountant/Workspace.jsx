@@ -25,38 +25,40 @@ const Workspace = ({
   analyzingFile,
 }) => {
   // Initial folder structure based on the image
-const [folderStructure, setFolderStructure] = useState({
-  Financial_Reports: {
-    expanded: false,
-    description: "All main financial reports (Balance Sheet, Income Statement, etc.)",
-    purpose: "For stakeholders (investors, board, auditors)",
-    files: [],
-  },
-  Managerial_Reports: {
-    expanded: false,
-    description: "All reports for internal use (performance, cost, forecast)",
-    purpose: "For CEO, managers, decision making",
-    files: [],
-  },
-  Tax_Reports: {
-    expanded: false,
-    description: "Official tax reports for the government",
-    purpose: "For tax compliance and SPT reporting",
-    files: [],
-  },
-  Compliance_Documents: {
-    expanded: false,
-    description: "Audit reports, proof of tax compliance, internal control documents",
-    purpose: "For legal proof and external reviews",
-    files: [],
-  },
-  Uncategorized: {
-    expanded: true,
-    description: "Files that have not been categorized yet",
-    purpose: "Temporary storage for new uploads",
-    files: files || [],
-  },
-});
+  const [folderStructure, setFolderStructure] = useState({
+    Financial_Reports: {
+      expanded: false,
+      description:
+        "All main financial reports (Balance Sheet, Income Statement, etc.)",
+      purpose: "For stakeholders (investors, board, auditors)",
+      files: [],
+    },
+    Managerial_Reports: {
+      expanded: false,
+      description: "All reports for internal use (performance, cost, forecast)",
+      purpose: "For CEO, managers, decision making",
+      files: [],
+    },
+    Tax_Reports: {
+      expanded: false,
+      description: "Official tax reports for the government",
+      purpose: "For tax compliance and SPT reporting",
+      files: [],
+    },
+    Compliance_Documents: {
+      expanded: false,
+      description:
+        "Audit reports, proof of tax compliance, internal control documents",
+      purpose: "For legal proof and external reviews",
+      files: [],
+    },
+    Uncategorized: {
+      expanded: true,
+      description: "Files that have not been categorized yet",
+      purpose: "Temporary storage for new uploads",
+      files: files || [],
+    },
+  });
 
   // Update Uncategorized folder when files prop changes
   useEffect(() => {
@@ -216,8 +218,25 @@ const [folderStructure, setFolderStructure] = useState({
     }
   };
 
+  // Check if a file has been processed
+  const isFileProcessed = (fileName) => {
+    const processedFiles = JSON.parse(
+      localStorage.getItem("processedFiles") || "[]"
+    );
+    return processedFiles.includes(fileName);
+  };
+
   // Get appropriate icon for file type
   const getFileIcon = (fileName) => {
+    // Check if this is a manual entry PDF (follows our naming pattern)
+    const isManualEntry =
+      fileName.startsWith("Transaction_") ||
+      fileName.match(/^\d{4}-\d{2}-\d{2}_[A-Z][a-z]+/);
+
+    if (isManualEntry) {
+      return <Receipt size={16} className="text-green-400" />;
+    }
+
     const extension = fileName.split(".").pop().toLowerCase();
 
     if (["pdf", "doc", "docx", "txt"].includes(extension)) {
@@ -281,7 +300,11 @@ const [folderStructure, setFolderStructure] = useState({
             onClick={() => handleFileProcessing(file.name)}
             disabled={analyzingFile === file.name}
           >
-            {analyzingFile === file.name ? "Processing..." : "Process"}
+            {analyzingFile === file.name
+              ? "Processing..."
+              : isFileProcessed(file.name)
+              ? "Process Again"
+              : "Process to Log Trails"}
           </button>
           <div className="border-t border-gray-700 my-1"></div>
           <div className="px-4 py-2 text-xs text-gray-500">Move to folder:</div>
@@ -678,9 +701,14 @@ const [folderStructure, setFolderStructure] = useState({
                       >
                         <div className="flex items-center">
                           {getFileIcon(file.name)}
-                          <span className="ml-2 text-gray-300">
-                            {file.name}
-                          </span>
+                          <div className="ml-2">
+                            <span className="text-gray-300">{file.name}</span>
+                            {isFileProcessed(file.name) && (
+                              <span className="ml-2 text-xs px-1.5 py-0.5 bg-green-900/50 text-green-400 rounded-full">
+                                Processed
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex items-center space-x-2">
