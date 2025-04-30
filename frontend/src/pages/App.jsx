@@ -72,12 +72,97 @@ function App({ actor, isAuthenticated, login }) {
       confirmButtonColor: "#3085d6",
       cancelButtonColor: "#d33",
       confirmButtonText: "Yes, delete it!",
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        setTransactions((prevTransactions) =>
-          prevTransactions.filter((t) => t.id !== transactionId)
+        const filteredTransactions = transactions.filter(
+          (t) => t.id !== transactionId
         );
-        Swal.fire("Deleted!", "The transaction has been deleted.", "success");
+
+        // Format transactions to match expected structure
+        const formattedTransactions = filteredTransactions.map((t) => ({
+          id: t.id,
+          transactionType: t.transactionType,
+          amount:
+            typeof t.amount === "number"
+              ? t.amount
+              : parseFloat(t.amount || "0"),
+          date: t.date || "",
+          description: t.description || "",
+          category: t.category || null,
+          paymentMethod: t.paymentMethod || null,
+          reference: t.reference || null,
+          taxDeductible: !!t.taxDeductible,
+          sourceFile: t.sourceFile || null,
+          timestamp: t.timestamp || new Date().toISOString(),
+        }));
+
+        setTransactions(formattedTransactions);
+
+        try {
+          // Save updated transactions to localStorage
+          console.log(
+            "Saving updated transactions after deletion to localStorage:",
+            formattedTransactions
+          );
+          localStorage.setItem(
+            "transactions",
+            JSON.stringify(formattedTransactions)
+          );
+          Swal.fire("Deleted!", "The transaction has been deleted.", "success");
+        } catch (error) {
+          console.error("Failed to delete transaction:", error);
+          Swal.fire(
+            "Error",
+            "Failed to delete transaction. Please try again.",
+            "error"
+          );
+        }
+      }
+    });
+  };
+
+  const handleDeleteAllTransactions = () => {
+    if (transactions.length === 0) {
+      Swal.fire(
+        "No Transactions",
+        "There are no transactions to delete.",
+        "info"
+      );
+      return;
+    }
+
+    Swal.fire({
+      title: "Delete All Transactions?",
+      text: "This will permanently delete ALL transactions. This action cannot be undone!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete all!",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          console.log("Deleting all transactions from localStorage");
+          // Clear transactions from localStorage
+          localStorage.setItem("transactions", JSON.stringify([]));
+          console.log(
+            "Successfully deleted all transactions from localStorage"
+          );
+          // Clear transactions from state
+          setTransactions([]);
+          Swal.fire(
+            "Deleted!",
+            "All transactions have been deleted.",
+            "success"
+          );
+        } catch (error) {
+          console.error("Failed to delete all transactions:", error);
+          Swal.fire(
+            "Error",
+            "Failed to delete all transactions. Please try again.",
+            "error"
+          );
+        }
       }
     });
   };
@@ -247,8 +332,55 @@ function App({ actor, isAuthenticated, login }) {
 
     if (actor) {
       loadFiles();
+      loadTransactions();
     }
   }, [actor, isAuthenticated, navigate]);
+
+  // Load transactions from localStorage
+  function loadTransactions() {
+    try {
+      console.log("Loading transactions from localStorage...");
+      const storedTransactions = JSON.parse(
+        localStorage.getItem("transactions") || "[]"
+      );
+      console.log("Transactions loaded from localStorage:", storedTransactions);
+
+      if (storedTransactions && storedTransactions.length > 0) {
+        console.log(
+          `Setting ${storedTransactions.length} transactions from localStorage`
+        );
+
+        // Format transactions to ensure they match our expected structure
+        const formattedTransactions = storedTransactions.map((t) => ({
+          id: t.id,
+          transactionType: t.transactionType,
+          amount:
+            typeof t.amount === "number"
+              ? t.amount
+              : parseFloat(t.amount || "0"),
+          date: t.date || "",
+          description: t.description || "",
+          category: t.category || null,
+          paymentMethod: t.paymentMethod || null,
+          reference: t.reference || null,
+          taxDeductible: !!t.taxDeductible,
+          sourceFile: t.sourceFile || null,
+          timestamp: t.timestamp || new Date().toISOString(),
+        }));
+
+        console.log("Formatted transactions:", formattedTransactions);
+        setTransactions(formattedTransactions);
+      } else {
+        console.log("No transactions found in localStorage");
+      }
+    } catch (error) {
+      console.error("Failed to load transactions:", error);
+      addProcessingLog(
+        `Failed to load transactions: ${error.message}`,
+        "error"
+      );
+    }
+  }
 
   // This component is now replaced by the inline analysis result display
 
@@ -294,7 +426,7 @@ For each transaction, extract the following specific information:
 
 Return ONLY a valid JSON array with these fields. If you can't determine a value, use null.
 
-ALWAYS return an array of transactions, even if there's only one transaction:
+ALWAYS return an array of transactions, even if there's only one transaction,if there is more, return all of detected transactions, do not hallucinate, read all entire trasanctions, complete, recursively, to ensure no transaction is missing:
 [
   {
     "transactionType": "expense",
@@ -395,10 +527,51 @@ Document: ${truncatedContent}`;
                 })
               );
 
-              setTransactions((prevTransactions) => [
-                ...prevTransactions,
-                ...timestampedTransactions,
-              ]);
+              // Fix: We need to make sure the transaction structure matches what the backend expects
+              const formattedTransactions = timestampedTransactions.map(
+                (t) => ({
+                  id: t.id,
+                  transactionType: t.transactionType,
+                  amount:
+                    typeof t.amount === "number"
+                      ? t.amount
+                      : parseFloat(t.amount || "0"),
+                  date: t.date || "",
+                  description: t.description || "",
+                  category: t.category || null,
+                  paymentMethod: t.paymentMethod || null,
+                  reference: t.reference || null,
+                  taxDeductible: !!t.taxDeductible,
+                  sourceFile: t.sourceFile || null,
+                  timestamp: t.timestamp || new Date().toISOString(),
+                })
+              );
+
+              const updatedTransactions = [
+                ...transactions, // Use the current transactions state
+                ...formattedTransactions,
+              ];
+
+              setTransactions(updatedTransactions);
+
+              // Save to localStorage
+              try {
+                console.log(
+                  "Saving transactions to localStorage:",
+                  updatedTransactions
+                );
+                localStorage.setItem(
+                  "transactions",
+                  JSON.stringify(updatedTransactions)
+                );
+                console.log("Transactions saved successfully to localStorage");
+              } catch (error) {
+                console.error(
+                  "Failed to save transactions to localStorage:",
+                  error
+                );
+                console.error("Error details:", error);
+              }
             }
 
             // Show the extracted data in a popup for review
@@ -641,10 +814,54 @@ File name: ${fileName}`,
               id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             }));
 
-            setTransactions((prevTransactions) => [
-              ...prevTransactions,
-              ...timestampedTransactions,
-            ]);
+            // Fix: We need to make sure the transaction structure matches what the backend expects
+            const formattedTransactions = timestampedTransactions.map((t) => ({
+              id: t.id,
+              transactionType: t.transactionType,
+              amount:
+                typeof t.amount === "number"
+                  ? t.amount
+                  : parseFloat(t.amount || "0"),
+              date: t.date || "",
+              description: t.description || "",
+              category: t.category || null,
+              paymentMethod: t.paymentMethod || null,
+              reference: t.reference || null,
+              taxDeductible: !!t.taxDeductible,
+              sourceFile: t.sourceFile || null,
+              timestamp: t.timestamp || new Date().toISOString(),
+            }));
+
+            const updatedTransactions = [
+              ...transactions, // Use the current transactions state
+              ...formattedTransactions,
+            ];
+
+            setTransactions(updatedTransactions);
+
+            // Save to localStorage
+            try {
+              console.log(
+                "Saving transactions to localStorage:",
+                updatedTransactions
+              );
+              localStorage.setItem(
+                "transactions",
+                JSON.stringify(updatedTransactions)
+              );
+              console.log("Transactions saved successfully to localStorage");
+              addProcessingLog(`Transactions saved to localStorage`, "success");
+            } catch (error) {
+              console.error(
+                "Failed to save transactions to localStorage:",
+                error
+              );
+              console.error("Error details:", error);
+              addProcessingLog(
+                `Failed to save transactions to localStorage: ${error.message}`,
+                "error"
+              );
+            }
 
             addProcessingLog(
               `${timestampedTransactions.length} transactions added to log trails`,
@@ -1781,6 +1998,7 @@ File name: ${fileName}`,
                       onViewTransaction={handleViewTransaction}
                       onDeleteTransaction={handleDeleteTransaction}
                       onExportTransactions={handleExportTransactions}
+                      onDeleteAllTransactions={handleDeleteAllTransactions}
                     />
                   )}
 
