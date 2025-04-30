@@ -29,21 +29,213 @@ import Validation from "../components/accountant/Validation";
 import Analysis from "../components/accountant/Analysis";
 import Reports from "../components/accountant/Reports";
 import Recommendations from "../components/accountant/Recommendations";
+import LogTrails from "../components/accountant/LogTrails";
+import TransactionDetails from "../components/accountant/TransactionDetails";
+import ProcessingLog from "../components/accountant/ProcessingLog";
 
 function App({ actor, isAuthenticated, login }) {
   const navigate = useNavigate();
   const [files, setFiles] = useState([]);
-  const [manualEntries, setManualEntries] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [errorMessage, setErrorMessage] = useState();
   const [fileTransferProgress, setFileTransferProgress] = useState();
   const [isLoading, setIsLoading] = useState(true);
   const [dragActive, setDragActive] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
   const [analyzingFile, setAnalyzingFile] = useState("");
   const [activeMainCategory, setActiveMainCategory] = useState("accountant");
   const [activeSubTab, setActiveSubTab] = useState("data-input");
+  const [processingMode, setProcessingMode] = useState("auto"); // "auto" or "manual"
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [manualEntries, setManualEntries] = useState([]);
 
-  // Sample data removed as it's no longer needed with the new component structure
+  // Processing log state
+  const [processingLogs, setProcessingLogs] = useState([]);
+  const [showProcessingLog, setShowProcessingLog] = useState(false);
+  const [minimizeProcessingLog, setMinimizeProcessingLog] = useState(false);
+
+  // Transaction handling functions
+  const handleViewTransaction = (transaction) => {
+    setSelectedTransaction(transaction);
+  };
+
+  const handleCloseTransactionDetails = () => {
+    setSelectedTransaction(null);
+  };
+
+  const handleDeleteTransaction = (transactionId) => {
+    Swal.fire({
+      title: "Are you sure?",
+      text: "This transaction will be permanently deleted.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setTransactions((prevTransactions) =>
+          prevTransactions.filter((t) => t.id !== transactionId)
+        );
+        Swal.fire("Deleted!", "The transaction has been deleted.", "success");
+      }
+    });
+  };
+
+  const handleExportTransactions = () => {
+    // Create CSV content
+    const headers = [
+      "Date",
+      "Type",
+      "Description",
+      "Category",
+      "Amount",
+      "Payment Method",
+      "Reference",
+      "Tax Deductible",
+      "Source File",
+    ];
+    const csvContent = [
+      headers.join(","),
+      ...transactions.map((t) =>
+        [
+          t.date || "",
+          t.transactionType || "",
+          `"${(t.description || "").replace(/"/g, '""')}"`, // Escape quotes in description
+          t.category || "",
+          t.amount || 0,
+          t.paymentMethod || "",
+          t.reference || "",
+          t.taxDeductible ? "Yes" : "No",
+          t.sourceFile || "Manual Entry",
+        ].join(",")
+      ),
+    ].join("\n");
+
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `transactions_export_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const closeAnalysis = () => {
+    setAnalysisResult(null);
+    setAnalyzingFile("");
+  };
+
+  // Processing log functions
+  const addProcessingLog = (message, type = "info") => {
+    const timestamp = new Date().toLocaleTimeString();
+    setProcessingLogs((prev) => [...prev, { message, type, timestamp }]);
+
+    // Show the log window if it's not already visible
+    if (!showProcessingLog) {
+      setShowProcessingLog(true);
+    }
+  };
+
+  const clearProcessingLogs = () => {
+    setProcessingLogs([]);
+  };
+
+  const closeProcessingLog = () => {
+    setShowProcessingLog(false);
+    clearProcessingLogs();
+  };
+
+  const toggleMinimizeProcessingLog = () => {
+    setMinimizeProcessingLog((prev) => !prev);
+  };
+
+  // Helper function to extract JSON from text
+  function extractJsonFromText(text) {
+    console.log("Attempting to extract JSON from text");
+
+    // First, check if the text is already valid JSON
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        console.log("Text is already valid JSON array");
+        return text;
+      }
+    } catch (e) {
+      // Not valid JSON, continue with extraction
+    }
+
+    // Handle the specific format we're seeing in the logs
+    if (text.includes("```json") && text.includes("```")) {
+      console.log("Found markdown JSON code block");
+      // Extract content between ```json and ```
+      const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) {
+        const jsonContent = match[1].trim();
+        console.log(
+          "Extracted from code block:",
+          jsonContent.substring(0, 50) + "..."
+        );
+        return jsonContent;
+      }
+    }
+
+    // Try to extract from any markdown code blocks
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      const potentialJson = codeBlockMatch[1].trim();
+      console.log(
+        "Found content in code block:",
+        potentialJson.substring(0, 50) + "..."
+      );
+
+      // Check if it starts with [ and ends with ]
+      if (potentialJson.startsWith("[") && potentialJson.endsWith("]")) {
+        return potentialJson;
+      }
+    }
+
+    // Look for anything that looks like a JSON array
+    const jsonPattern = /\[\s*\{\s*"[^"]+"\s*:[\s\S]*?\}\s*\]/g;
+    const jsonMatches = text.match(jsonPattern);
+    if (jsonMatches && jsonMatches.length > 0) {
+      console.log("Found JSON-like array pattern");
+      return jsonMatches[0];
+    }
+
+    // Most aggressive approach - just find everything between the first [ and the last ]
+    const startBracket = text.indexOf("[");
+    const endBracket = text.lastIndexOf("]");
+
+    if (startBracket !== -1 && endBracket !== -1 && startBracket < endBracket) {
+      console.log("Extracting everything between first [ and last ]");
+      return text.substring(startBracket, endBracket + 1).trim();
+    }
+
+    // If all else fails, try to find individual JSON objects and combine them
+    const objectPattern = /\{\s*"[^"]+"\s*:[\s\S]*?(?:\}\s*,|\}$)/g;
+    const matches = Array.from(text.matchAll(objectPattern));
+    if (matches && matches.length > 0) {
+      console.log(`Found ${matches.length} potential JSON objects`);
+      const objects = matches.map((match) => {
+        let obj = match[0].trim();
+        if (obj.endsWith(",")) {
+          obj = obj.slice(0, -1);
+        }
+        return obj;
+      });
+      return "[" + objects.join(",") + "]";
+    }
+
+    console.log("Could not extract JSON from text");
+    return null;
+  }
 
   const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4";
 
@@ -81,18 +273,55 @@ function App({ actor, isAuthenticated, login }) {
             "... [content truncated due to length]"
           : fileContent;
 
-      // Construct a prompt that's specific to accounting documents
-      const prompt = `
-You are Hi! Countant, an AI accountant assistant. Please analyze this document and provide:
+      // Construct a prompt that's specific to extracting transaction data
+      const prompt = `You are Hi! Countant, an AI accountant assistant. Please analyze this document and extract ALL financial transaction information.
 
-1. A summary of key financial information
-2. Any important dates, amounts, or transactions
-3. Accounting implications or recommendations
-4. Potential tax considerations
-5. Any anomalies or items that require attention
+IMPORTANT: This file likely contains MULTIPLE transactions (like a bank statement, expense report, or accounting table). You MUST extract ALL transactions and return them as an array of transaction objects.
 
-Document: ${truncatedContent}
-      `;
+PAY SPECIAL ATTENTION TO TABULAR DATA: If the file contains a table of transactions, make sure to extract each row as a separate transaction. Look for patterns like dates, amounts, descriptions, etc. in columns.
+
+BE EXTREMELY THOROUGH: Scan the entire document carefully. Don't miss any transactions. Look for tables, lists, or any structured data that contains financial information. If there are multiple pages, check all of them.
+
+For each transaction, extract the following specific information:
+1. Transaction type: Determine based on context - use "expense" for debits/payments/outgoing funds and "income" for credits/deposits/incoming funds
+2. Amount: Extract numeric value only (no currency symbols)
+3. Date: Convert to YYYY-MM-DD format
+4. Description: Use the transaction description or memo field
+5. Category: Extract from document or infer from description
+6. Payment method: Extract if available
+7. Reference number: Extract if available
+8. Is it tax deductible: Set to true for business expenses, false for personal or non-deductible items
+
+Return ONLY a valid JSON array with these fields. If you can't determine a value, use null.
+
+ALWAYS return an array of transactions, even if there's only one transaction:
+[
+  {
+    "transactionType": "expense",
+    "amount": 125.50,
+    "date": "2023-05-15",
+    "description": "Office supplies purchase",
+    "category": "Office Supplies",
+    "paymentMethod": "credit card",
+    "reference": "INV-12345",
+    "taxDeductible": true
+  }
+]
+
+For tables with "Debit" and "Credit" columns:
+- Transactions with values in the "Debit" column should be "expense" type
+- Transactions with values in the "Credit" column should be "income" type
+- Use the amount from whichever column has a value
+
+For bank statements or financial reports:
+- Extract ALL line items in the statement
+- Pay attention to transaction dates, descriptions, and amounts
+- Look for transaction codes, reference numbers, or categories
+- If there are running balances, focus on the individual transactions, not the balance
+
+EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
+
+Document: ${truncatedContent}`;
 
       // Call Gemini API
       const response = await fetch(
@@ -109,7 +338,7 @@ Document: ${truncatedContent}
               },
             ],
             generationConfig: {
-              temperature: 0.2,
+              temperature: 0.1,
               topK: 40,
               topP: 0.95,
               maxOutputTokens: 8192,
@@ -130,14 +359,113 @@ Document: ${truncatedContent}
 
       // Extract the content from Gemini's response format
       const content = result.candidates[0].content.parts[0].text;
-      const cleanedcontent = content.replace(/[\*`']/g, "");
 
-      setAnalysisResult({
-        fileName: fileName,
-        content: cleanedcontent,
-      });
+      // Try to parse the JSON from the response
+      try {
+        console.log("Full content from Gemini:", content);
 
-      return result;
+        // Use our helper function to extract JSON
+        const jsonStr = extractJsonFromText(content);
+
+        if (jsonStr) {
+          console.log(
+            "Extracted JSON string (first 100 chars):",
+            jsonStr.substring(0, 100) + "..."
+          );
+
+          try {
+            const transactions = JSON.parse(jsonStr);
+
+            console.log(
+              `Extracted ${transactions.length} transactions from ${fileName}`
+            );
+
+            // Add the extracted transactions to our state if in auto mode
+            // or if this file was explicitly selected for processing
+            if (processingMode === "auto" || analyzingFile === fileName) {
+              // Add file reference and timestamp to each transaction
+              const timestampedTransactions = transactions.map(
+                (transaction) => ({
+                  ...transaction,
+                  sourceFile: fileName,
+                  timestamp: new Date().toISOString(),
+                  id: `${Date.now()}-${Math.random()
+                    .toString(36)
+                    .substring(2, 9)}`,
+                })
+              );
+
+              setTransactions((prevTransactions) => [
+                ...prevTransactions,
+                ...timestampedTransactions,
+              ]);
+            }
+
+            // Show the extracted data in a popup for review
+            Swal.fire({
+              icon: "success",
+              title: "Document Processed",
+              html: `
+                <div class="text-left">
+                  <p>${
+                    processingMode === "auto" || analyzingFile === fileName
+                      ? `Successfully extracted and added ${transactions.length} transactions from ${fileName} to log trails`
+                      : `Successfully extracted ${transactions.length} transactions from ${fileName}. Switch to manual processing mode to add them to log trails.`
+                  }</p>
+                  <div class="mt-4">
+                    <h3 class="text-lg font-bold mb-2">Extracted Transactions:</h3>
+                    <div class="bg-gray-100 p-3 rounded max-h-60 overflow-auto text-sm">
+                      <pre>${JSON.stringify(
+                        transactions.slice(0, 10),
+                        null,
+                        2
+                      )}${
+                transactions.length > 10
+                  ? "\n\n... and " +
+                    (transactions.length - 10) +
+                    " more transactions"
+                  : ""
+              }</pre>
+                    </div>
+                  </div>
+                </div>
+              `,
+              width: "600px",
+            });
+
+            // Mark file as processed in localStorage
+            const processedFiles = JSON.parse(
+              localStorage.getItem("processedFiles") || "[]"
+            );
+            if (!processedFiles.includes(fileName)) {
+              processedFiles.push(fileName);
+              localStorage.setItem(
+                "processedFiles",
+                JSON.stringify(processedFiles)
+              );
+            }
+
+            return { transactions, rawContent: content };
+          } catch (parseError) {
+            console.error("Error parsing JSON:", parseError);
+            throw new Error("Failed to parse JSON: " + parseError.message);
+          }
+        } else {
+          console.log("No valid JSON string found");
+          throw new Error("No valid JSON found in the response");
+        }
+      } catch (jsonError) {
+        console.error("Failed to parse JSON from Gemini response:", jsonError);
+        console.log("Raw content:", content);
+
+        Swal.fire({
+          icon: "warning",
+          title: "Processing Issue",
+          text: "The document was processed, but we couldn't extract structured transaction data. Please try again or use manual entry.",
+        });
+
+        return { rawContent: content };
+      }
     } catch (error) {
       Swal.close();
       Swal.fire({
@@ -148,6 +476,8 @@ Document: ${truncatedContent}
       console.error("AI processing failed:", error);
       setAnalyzingFile("");
       return null;
+    } finally {
+      setAnalyzingFile("");
     }
   }
 
@@ -160,6 +490,7 @@ Document: ${truncatedContent}
   ) {
     try {
       setAnalyzingFile(fileName);
+      addProcessingLog(`Starting Gemini AI processing for ${fileName}`, "info");
 
       Swal.fire({
         title: "Processing document...",
@@ -171,6 +502,9 @@ Document: ${truncatedContent}
       });
 
       // Construct the API request with multimodal content (text + image/PDF)
+      addProcessingLog(`Preparing API request to Gemini`, "info");
+      addProcessingLog(`Using model: gemini-2.5-flash-preview-04-17`, "info");
+
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${GEMINI_API_KEY}`,
         {
@@ -183,7 +517,54 @@ Document: ${truncatedContent}
               {
                 parts: [
                   {
-                    text: `You are Hi! Countant, an AI accountant assistant. Please analyze this ${fileTypeContext} file and provide:\n\n1. A summary of key financial information\n2. Any important dates, amounts, or transactions\n3. Accounting implications or recommendations\n4. Potential tax considerations\n5. Any anomalies or items that require attention\n\nFile name: ${fileName}`,
+                    text: `You are Hi! Countant, an AI accountant assistant. Please analyze this ${fileTypeContext} file and extract ALL financial transaction information.
+
+IMPORTANT: This file likely contains MULTIPLE transactions (like a bank statement, expense report, or accounting table). You MUST extract ALL transactions and return them as an array of transaction objects.
+
+PAY SPECIAL ATTENTION TO TABULAR DATA: If the file contains a table of transactions, make sure to extract each row as a separate transaction. Look for patterns like dates, amounts, descriptions, etc. in columns.
+
+BE EXTREMELY THOROUGH: Scan the entire document carefully. Don't miss any transactions. Look for tables, lists, or any structured data that contains financial information. If there are multiple pages, check all of them.
+
+For each transaction, extract the following specific information:
+1. Transaction type: Determine based on context - use "expense" for debits/payments/outgoing funds and "income" for credits/deposits/incoming funds
+2. Amount: Extract numeric value only (no currency symbols)
+3. Date: Convert to YYYY-MM-DD format
+4. Description: Use the transaction description or memo field
+5. Category: Extract from document or infer from description
+6. Payment method: Extract if available
+7. Reference number: Extract if available
+8. Is it tax deductible: Set to true for business expenses, false for personal or non-deductible items
+
+Return ONLY a valid JSON array with these fields. If you can't determine a value, use null.
+
+ALWAYS return an array of transactions, even if there's only one transaction:
+[
+  {
+    "transactionType": "expense",
+    "amount": 125.50,
+    "date": "2023-05-15",
+    "description": "Office supplies purchase",
+    "category": "Office Supplies",
+    "paymentMethod": "credit card",
+    "reference": "INV-12345",
+    "taxDeductible": true
+  }
+]
+
+For tables with "Debit" and "Credit" columns:
+- Transactions with values in the "Debit" column should be "expense" type
+- Transactions with values in the "Credit" column should be "income" type
+- Use the amount from whichever column has a value
+
+For PDF bank statements or financial reports:
+- Extract ALL line items in the statement
+- Pay attention to transaction dates, descriptions, and amounts
+- Look for transaction codes, reference numbers, or categories
+- If there are running balances, focus on the individual transactions, not the balance
+
+EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
+
+File name: ${fileName}`,
                   },
                   {
                     inline_data: {
@@ -195,7 +576,7 @@ Document: ${truncatedContent}
               },
             ],
             generationConfig: {
-              temperature: 0.2,
+              temperature: 0.1,
               topK: 40,
               topP: 0.95,
               maxOutputTokens: 8192,
@@ -204,27 +585,176 @@ Document: ${truncatedContent}
         }
       );
 
+      addProcessingLog(`Sending request to Gemini API...`, "info");
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          `Gemini API error: ${errorData.error?.message || response.statusText}`
-        );
+        const errorMessage = errorData.error?.message || response.statusText;
+        addProcessingLog(`Gemini API error: ${errorMessage}`, "error");
+        throw new Error(`Gemini API error: ${errorMessage}`);
       }
 
+      addProcessingLog(`Received response from Gemini API`, "success");
       const result = await response.json();
       Swal.close();
 
       // Extract the content from Gemini's response format
       const content = result.candidates[0].content.parts[0].text;
+      addProcessingLog(`Response size: ${content.length} characters`, "info");
 
-      setAnalysisResult({
-        fileName: fileName,
-        content: content,
-      });
+      // Try to parse the JSON from the response
+      try {
+        console.log("Binary processing - Full content from Gemini:", content);
+        addProcessingLog(`Attempting to extract JSON from response`, "info");
 
-      return result;
+        // Use our helper function to extract JSON
+        const jsonStr = extractJsonFromText(content);
+
+        if (jsonStr) {
+          console.log(
+            "Binary processing - Extracted JSON string (first 100 chars):",
+            jsonStr.substring(0, 100) + "..."
+          );
+          addProcessingLog(`JSON data found in response`, "success");
+
+          try {
+            addProcessingLog(`Parsing JSON data...`, "info");
+            const transactions = JSON.parse(jsonStr);
+
+            console.log(
+              `Extracted ${transactions.length} transactions from ${fileName}`
+            );
+            addProcessingLog(
+              `Successfully extracted ${transactions.length} transactions`,
+              "success"
+            );
+
+            // ALWAYS add transactions to log trails when a file is explicitly processed
+            // This ensures that when a user clicks "Process File", the transactions are added
+            addProcessingLog(`Adding transactions to log trails`, "info");
+
+            // Add file reference and timestamp to each transaction
+            const timestampedTransactions = transactions.map((transaction) => ({
+              ...transaction,
+              sourceFile: fileName,
+              timestamp: new Date().toISOString(),
+              id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            }));
+
+            setTransactions((prevTransactions) => [
+              ...prevTransactions,
+              ...timestampedTransactions,
+            ]);
+
+            addProcessingLog(
+              `${timestampedTransactions.length} transactions added to log trails`,
+              "success"
+            );
+
+            // Now we can clear the analyzingFile state
+            setAnalyzingFile("");
+
+            // Mark file as processed in localStorage
+            const processedFiles = JSON.parse(
+              localStorage.getItem("processedFiles") || "[]"
+            );
+            if (!processedFiles.includes(fileName)) {
+              processedFiles.push(fileName);
+              localStorage.setItem(
+                "processedFiles",
+                JSON.stringify(processedFiles)
+              );
+              addProcessingLog(`Marked ${fileName} as processed`, "info");
+            }
+
+            // Show the extracted data in a popup for review
+            Swal.fire({
+              icon: "success",
+              title: "Document Processed",
+              html: `
+                <div class="text-left">
+                  <p>Successfully extracted and added ${
+                    transactions.length
+                  } transaction${
+                transactions.length !== 1 ? "s" : ""
+              } from ${fileName} to log trails.</p>
+                  <div class="mt-4">
+                    <h3 class="text-lg font-bold mb-2">Extracted Transactions:</h3>
+                    <div class="bg-gray-100 p-3 rounded max-h-60 overflow-auto text-sm">
+                      <pre>${JSON.stringify(
+                        transactions.slice(0, 10),
+                        null,
+                        2
+                      )}${
+                transactions.length > 10
+                  ? "\n\n... and " +
+                    (transactions.length - 10) +
+                    " more transactions"
+                  : ""
+              }</pre>
+                    </div>
+                  </div>
+                </div>
+              `,
+              width: "600px",
+            });
+
+            return { transactions, rawContent: content };
+          } catch (parseError) {
+            console.error(
+              "Binary processing - Error parsing JSON:",
+              parseError
+            );
+            addProcessingLog(
+              `Error parsing JSON: ${parseError.message}`,
+              "error"
+            );
+            throw new Error("Failed to parse JSON: " + parseError.message);
+          }
+        } else {
+          console.log("Binary processing - No valid JSON string found");
+          addProcessingLog(`No valid JSON found in the response`, "error");
+          throw new Error("No valid JSON found in the response");
+        }
+      } catch (jsonError) {
+        console.error("Failed to parse JSON from Gemini response:", jsonError);
+        console.log("Raw content:", content);
+        addProcessingLog(
+          `Failed to extract structured data: ${jsonError.message}`,
+          "warning"
+        );
+
+        // Show a more detailed error message with options
+        Swal.fire({
+          icon: "warning",
+          title: "Processing Issue",
+          html: `
+            <div class="text-left">
+              <p>The document was processed, but we couldn't extract structured transaction data.</p>
+              <p class="mt-2">This could be due to:</p>
+              <ul class="list-disc pl-5 mt-1 text-sm">
+                <li>Document format not being recognized properly</li>
+                <li>No clear transaction data in the document</li>
+                <li>AI model limitations in extracting this specific format</li>
+              </ul>
+              <p class="mt-2">You can:</p>
+              <ul class="list-disc pl-5 mt-1 text-sm">
+                <li>Try processing again</li>
+                <li>Use manual data entry instead</li>
+                <li>Try a different document format</li>
+              </ul>
+            </div>
+          `,
+          confirmButtonText: "OK",
+        });
+
+        // Don't mark the file as processed since we couldn't extract data
+        setAnalyzingFile(""); // Clear the analyzing state
+        return { rawContent: content };
+      }
     } catch (error) {
       Swal.close();
+      addProcessingLog(`Processing failed: ${error.message}`, "error");
       Swal.fire({
         icon: "error",
         title: "Processing Failed",
@@ -233,6 +763,10 @@ Document: ${truncatedContent}
       console.error("AI processing failed:", error);
       setAnalyzingFile("");
       return null;
+    } finally {
+      // Don't clear analyzingFile here, as it's needed for the transaction processing logic
+      // We'll clear it after transactions are added to log trails
+      addProcessingLog(`Processing completed for ${fileName}`, "info");
     }
   }
 
@@ -365,6 +899,45 @@ Document: ${truncatedContent}
 
   async function handleFileProcessing(name) {
     try {
+      // Show processing log
+      setShowProcessingLog(true);
+      clearProcessingLogs();
+      addProcessingLog(`Starting to process file: ${name}`, "info");
+
+      // Check if file has already been processed
+      const processedFiles = JSON.parse(
+        localStorage.getItem("processedFiles") || "[]"
+      );
+
+      if (processedFiles.includes(name)) {
+        addProcessingLog(`File ${name} has already been processed`, "warning");
+        Swal.fire({
+          icon: "info",
+          title: "Already Processed",
+          text: `This document has already been processed. The transactions are in your log trails.`,
+          showCancelButton: true,
+          confirmButtonText: "Process Again",
+          cancelButtonText: "Cancel",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            // Remove from processed files to allow reprocessing
+            const updatedProcessedFiles = processedFiles.filter(
+              (file) => file !== name
+            );
+            localStorage.setItem(
+              "processedFiles",
+              JSON.stringify(updatedProcessedFiles)
+            );
+            addProcessingLog(`Reprocessing file: ${name}`, "info");
+            // Call the function again to process
+            handleFileProcessing(name);
+          } else {
+            addProcessingLog(`Processing cancelled for ${name}`, "info");
+          }
+        });
+        return;
+      }
+
       Swal.fire({
         title: "Reading file...",
         text: "Please wait while we load the file content",
@@ -374,14 +947,23 @@ Document: ${truncatedContent}
         },
       });
 
+      addProcessingLog(`Loading file content for ${name}...`, "info");
       const totalChunks = Number(await actor.getTotalChunks(name));
+      addProcessingLog(`File has ${totalChunks} chunks to process`, "info");
+
       const fileTypeResult = await actor.getFileType(name);
       const fileType =
         fileTypeResult && fileTypeResult.length > 0 ? fileTypeResult[0] : "";
+      addProcessingLog(`File type detected: ${fileType || "unknown"}`, "info");
 
       let chunks = [];
+      addProcessingLog(`Starting to download file chunks...`, "info");
 
       for (let i = 0; i < totalChunks; i++) {
+        addProcessingLog(
+          `Downloading chunk ${i + 1}/${totalChunks}...`,
+          "info"
+        );
         const chunkResult = await actor.getFileChunk(name, BigInt(i));
         const chunkBlob =
           chunkResult && chunkResult.length > 0 ? chunkResult[0] : null;
@@ -389,11 +971,16 @@ Document: ${truncatedContent}
         if (chunkBlob) {
           chunks.push(chunkBlob);
         } else {
+          addProcessingLog(`Failed to retrieve chunk ${i}`, "error");
           throw new Error(`Failed to retrieve chunk ${i}`);
         }
       }
 
+      addProcessingLog(`All chunks downloaded successfully`, "success");
+
       const data = new Blob(chunks, { type: fileType });
+      addProcessingLog(`Created blob with size: ${data.size} bytes`, "info");
+
       const isTextBased =
         fileType.includes("text") ||
         fileType.includes("csv") ||
@@ -443,22 +1030,73 @@ Document: ${truncatedContent}
         name.endsWith(".webp") ||
         name.endsWith(".svg");
 
+      // Check if this is a manual entry PDF (follows our naming pattern)
+      const isManualEntry =
+        name.startsWith("Transaction_") ||
+        name.match(/^\d{4}-\d{2}-\d{2}_[A-Z][a-z]+/);
+
+      // Log the file type detection
+      if (isTextBased) addProcessingLog(`Detected text-based file`, "info");
+      if (isSpreadsheet) addProcessingLog(`Detected spreadsheet file`, "info");
+      if (isDocument) addProcessingLog(`Detected document file`, "info");
+      if (isPDF) addProcessingLog(`Detected PDF file`, "info");
+      if (isImage) addProcessingLog(`Detected image file`, "info");
+      if (isManualEntry) addProcessingLog(`Detected manual entry file`, "info");
+
       if (isTextBased || isSpreadsheet || isDocument || isPDF || isImage) {
         // For text-based files, read as text
         if (isTextBased) {
+          addProcessingLog(`Processing text-based file: ${name}`, "info");
           const reader = new FileReader();
           reader.onload = async (e) => {
             const fileContent = e.target.result;
+            addProcessingLog(
+              `File content loaded, size: ${fileContent.length} characters`,
+              "info"
+            );
             const contentWithContext = `This is a text file.\n\nFile name: ${name}\n\nContent:\n${fileContent}`;
-            await processDocumentWithAI(contentWithContext, name);
+
+            // In manual mode, we only process when explicitly requested
+            // In auto mode, we process immediately
+            if (processingMode === "auto" || isManualEntry) {
+              addProcessingLog(
+                `Processing mode: ${
+                  processingMode === "auto" ? "automatic" : "manual"
+                }`,
+                "info"
+              );
+              addProcessingLog(
+                `Sending to Gemini AI for processing...`,
+                "info"
+              );
+              await processDocumentWithAI(contentWithContext, name);
+            } else {
+              // For manual mode, just show a success message
+              addProcessingLog(
+                `File loaded but not processed (manual mode)`,
+                "info"
+              );
+              Swal.close();
+              Swal.fire({
+                icon: "success",
+                title: "File Loaded",
+                text: `${name} is ready for processing. Click "Process File" again when you want to extract transactions.`,
+                showConfirmButton: true,
+              });
+            }
           };
           reader.readAsText(data);
         }
         // For binary files (PDFs, images, etc.), convert to base64 and send to Gemini
         else {
+          addProcessingLog(`Processing binary file: ${name}`, "info");
           const reader = new FileReader();
           reader.onload = async (e) => {
             const base64Content = e.target.result.split(",")[1]; // Remove the data URL prefix
+            addProcessingLog(
+              `Base64 content generated, length: ${base64Content.length}`,
+              "info"
+            );
 
             // Determine file type for context
             let fileTypeContext = "";
@@ -467,17 +1105,48 @@ Document: ${truncatedContent}
             if (isPDF) fileTypeContext = "PDF";
             if (isImage) fileTypeContext = "image";
 
-            // Send the binary data to Gemini for processing
-            await processDocumentWithBinaryData(
-              base64Content,
-              name,
-              fileTypeContext,
-              fileType
-            );
+            addProcessingLog(`File context type: ${fileTypeContext}`, "info");
+
+            // In manual mode, we only process when explicitly requested
+            // In auto mode, we process immediately
+            if (processingMode === "auto" || isManualEntry) {
+              addProcessingLog(
+                `Processing mode: ${
+                  processingMode === "auto" ? "automatic" : "manual"
+                }`,
+                "info"
+              );
+              addProcessingLog(
+                `Sending to Gemini AI for processing...`,
+                "info"
+              );
+
+              // Send the binary data to Gemini for processing
+              await processDocumentWithBinaryData(
+                base64Content,
+                name,
+                fileTypeContext,
+                fileType
+              );
+            } else {
+              // For manual mode, just show a success message
+              addProcessingLog(
+                `File loaded but not processed (manual mode)`,
+                "info"
+              );
+              Swal.close();
+              Swal.fire({
+                icon: "success",
+                title: "File Loaded",
+                text: `${name} is ready for processing. Click "Process File" again when you want to extract transactions.`,
+                showConfirmButton: true,
+              });
+            }
           };
           reader.readAsDataURL(data);
         }
       } else {
+        addProcessingLog(`Unsupported file type: ${fileType}`, "error");
         Swal.close();
         Swal.fire({
           icon: "warning",
@@ -487,6 +1156,7 @@ Document: ${truncatedContent}
       }
     } catch (error) {
       console.error("Processing failed:", error);
+      addProcessingLog(`Processing failed: ${error.message}`, "error");
       Swal.close();
       Swal.fire({
         icon: "error",
@@ -686,7 +1356,7 @@ Document: ${truncatedContent}
       const timestamp = Date.now().toString().slice(-6); // Use last 6 digits of timestamp for uniqueness
       const fileName = `Transaction_${date}_${type}_${amount}_${timestamp}.pdf`;
 
-      // In a real application, you would save this to the backend
+      // Save the manual entry to state
       const newEntry = {
         id: Date.now().toString(), // Generate a unique ID
         ...data,
@@ -702,14 +1372,40 @@ Document: ${truncatedContent}
       // Close the loading dialog
       Swal.close();
 
-      // Show success message
+      // ALWAYS process manual entries immediately, regardless of processing mode
       Swal.fire({
-        icon: "success",
-        title: "Transaction Saved",
-        text: "Your transaction has been recorded and added to your documents!",
-        timer: 2000,
-        timerProgressBar: true,
+        title: "Processing transaction...",
+        text: "Please wait while we add this transaction to log trails",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
       });
+
+      // We need to get the file from the backend to process it
+      const fileData = await handleFileDownload(fileName, true);
+
+      if (fileData) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const base64Content = e.target.result.split(",")[1]; // Remove the data URL prefix
+
+          // Process the PDF with Gemini
+          await processDocumentWithBinaryData(
+            base64Content,
+            fileName,
+            "PDF",
+            "application/pdf"
+          );
+        };
+        reader.readAsDataURL(fileData);
+      } else {
+        Swal.fire({
+          icon: "warning",
+          title: "Processing Issue",
+          text: "Could not process the transaction automatically. You can process it manually from the Workspace tab.",
+        });
+      }
 
       return true;
     } catch (error) {
@@ -806,11 +1502,6 @@ Document: ${truncatedContent}
     return <FileText className="text-gray-400" />;
   };
 
-  const closeAnalysis = () => {
-    setAnalysisResult(null);
-    setAnalyzingFile("");
-  };
-
   // Main navigation categories
   const mainCategories = [
     {
@@ -833,6 +1524,11 @@ Document: ${truncatedContent}
       id: "data-input",
       label: "Data Input",
       icon: <FileSpreadsheet size={20} />,
+    },
+    {
+      id: "log-trails",
+      label: "Log Trails",
+      icon: <Receipt size={20} />,
     },
     {
       id: "workspace",
@@ -1074,6 +1770,17 @@ Document: ${truncatedContent}
                       errorMessage={errorMessage}
                       fileTransferProgress={fileTransferProgress}
                       onSaveManualData={handleSaveManualData}
+                      processingMode={processingMode}
+                      onProcessingModeChange={setProcessingMode}
+                    />
+                  )}
+
+                  {activeSubTab === "log-trails" && (
+                    <LogTrails
+                      transactions={transactions}
+                      onViewTransaction={handleViewTransaction}
+                      onDeleteTransaction={handleDeleteTransaction}
+                      onExportTransactions={handleExportTransactions}
                     />
                   )}
 
@@ -1095,23 +1802,19 @@ Document: ${truncatedContent}
 
                   {activeSubTab === "recommendations" && <Recommendations />}
                 </>
-              )} 
+              )}
 
               {activeMainCategory === "advisor" && (
                 <>
                   {activeSubTab === "financial-planning" && (
-                    <FinancialPlanning
-                    />
+                    <FinancialPlanning />
                   )}
 
-                  {activeSubTab === "investment" && (
-                    <Investment
-                    />
-                  )}
+                  {activeSubTab === "investment" && <Investment />}
 
                   {activeSubTab === "tax-strategy" && <TaxStrategy />}
                 </>
-              )}  
+              )}
 
               {/* Advisor placeholder */}
               {activeMainCategory === "advisor" && (
@@ -1246,6 +1949,24 @@ Document: ${truncatedContent}
           </div>
         </div>
       )}
+
+      {/* Transaction Details Modal */}
+      {selectedTransaction && (
+        <TransactionDetails
+          transaction={selectedTransaction}
+          onClose={handleCloseTransactionDetails}
+          onDownloadPdf={handleFileDownload}
+        />
+      )}
+
+      {/* Processing Log */}
+      <ProcessingLog
+        logs={processingLogs}
+        visible={showProcessingLog}
+        onClose={closeProcessingLog}
+        onMinimize={toggleMinimizeProcessingLog}
+        minimized={minimizeProcessingLog}
+      />
     </div>
   );
 }
