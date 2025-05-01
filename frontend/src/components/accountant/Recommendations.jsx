@@ -1,57 +1,125 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lightbulb, TrendingUp, DollarSign, AlertCircle, ChevronRight } from 'lucide-react';
 
-const Recommendations = () => {
-  // Sample recommendations
-  const recommendations = [
-    { 
-      id: 1, 
-      title: 'Optimize Accounts Payable Process', 
-      description: 'Implement automated invoice processing to reduce manual data entry and improve accuracy.',
-      impact: 'High',
-      category: 'Process Improvement',
-      savings: '$5,000 annually'
-    },
-    { 
-      id: 2, 
-      title: 'Review Vendor Contracts', 
-      description: 'Several vendor contracts are due for renewal. Negotiate better terms based on your payment history.',
-      impact: 'Medium',
-      category: 'Cost Reduction',
-      savings: '$3,200 annually'
-    },
-    { 
-      id: 3, 
-      title: 'Implement Cash Flow Forecasting', 
-      description: 'Set up a 13-week cash flow forecast to better anticipate cash needs and optimize working capital.',
-      impact: 'High',
-      category: 'Financial Planning',
-      savings: 'Improved liquidity'
-    },
-    { 
-      id: 4, 
-      title: 'Tax Deduction Opportunity', 
-      description: 'Recent equipment purchases qualify for Section 179 deduction. Consult with tax advisor before year-end.',
-      impact: 'High',
-      category: 'Tax Optimization',
-      savings: '$12,000 tax savings'
-    },
-    { 
-      id: 5, 
-      title: 'Accounts Receivable Follow-up', 
-      description: 'Implement a structured follow-up process for overdue invoices to improve collection time.',
-      impact: 'Medium',
-      category: 'Cash Flow',
-      savings: 'Reduce DSO by 5 days'
-    },
-  ];
+const Recommendations = ({ transactions }) => {
+  const [recommendations, setRecommendations] = useState([]);
+
+  useEffect(() => {
+    if (transactions && transactions.length > 0) {
+      const generatedRecommendations = generateRecommendations(transactions);
+      setRecommendations(generatedRecommendations);
+    }
+  }, [transactions]);
+
+  const generateRecommendations = (transactions) => {
+    const recommendations = [];
+    
+    // Analyze cash flow
+    const monthlyCashFlow = {};
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+      
+      if (!monthlyCashFlow[monthKey]) {
+        monthlyCashFlow[monthKey] = {
+          income: 0,
+          expenses: 0
+        };
+      }
+
+      if (transaction.transactionType === 'income') {
+        monthlyCashFlow[monthKey].income += transaction.amount;
+      } else {
+        monthlyCashFlow[monthKey].expenses += transaction.amount;
+      }
+    });
+
+    // Check for cash flow issues
+    const cashFlowIssues = Object.entries(monthlyCashFlow).filter(([_, data]) => data.expenses > data.income);
+    if (cashFlowIssues.length > 0) {
+      recommendations.push({
+        id: 1,
+        title: 'Cash Flow Optimization Required',
+        description: `${cashFlowIssues.length} months show negative cash flow. Consider reviewing expenses and improving collection processes.`,
+        impact: 'High',
+        category: 'Cash Flow',
+        savings: 'Improve liquidity'
+      });
+    }
+
+    // Analyze expense categories
+    const expenseCategories = {};
+    transactions
+      .filter(t => t.transactionType === 'expense')
+      .forEach(transaction => {
+        const category = transaction.category || 'Uncategorized';
+        if (!expenseCategories[category]) {
+          expenseCategories[category] = 0;
+        }
+        expenseCategories[category] += transaction.amount;
+      });
+
+    // Find largest expense category
+    const largestCategory = Object.entries(expenseCategories)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    if (largestCategory) {
+      recommendations.push({
+        id: 2,
+        title: 'Review Largest Expense Category',
+        description: `${largestCategory[0]} is your largest expense category. Consider cost reduction strategies.`,
+        impact: 'Medium',
+        category: 'Cost Reduction',
+        savings: 'Potential savings in largest expense category'
+      });
+    }
+
+    // Check for tax optimization opportunities
+    const taxDeductibleExpenses = transactions
+      .filter(t => t.transactionType === 'expense' && t.taxDeductible)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalExpenses = transactions
+      .filter(t => t.transactionType === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    if (taxDeductibleExpenses / totalExpenses < 0.7) {
+      recommendations.push({
+        id: 3,
+        title: 'Tax Deduction Optimization',
+        description: 'Less than 70% of expenses are tax-deductible. Review expense categorization for tax benefits.',
+        impact: 'High',
+        category: 'Tax Optimization',
+        savings: 'Potential tax savings'
+      });
+    }
+
+    // Check for irregular transactions
+    const averageTransaction = transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length;
+    const irregularTransactions = transactions.filter(t => 
+      Math.abs(t.amount) > averageTransaction * 2
+    );
+
+    if (irregularTransactions.length > 0) {
+      recommendations.push({
+        id: 4,
+        title: 'Irregular Transaction Review',
+        description: `${irregularTransactions.length} transactions significantly deviate from average. Review for potential issues.`,
+        impact: 'Medium',
+        category: 'Risk Management',
+        savings: 'Reduce financial risk'
+      });
+    }
+
+    return recommendations;
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-white">Recommendations</h1>
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-400">Last updated: Today</span>
+          <span className="text-sm text-gray-400">Last updated: {new Date().toLocaleDateString()}</span>
         </div>
       </div>
 
@@ -61,7 +129,7 @@ const Recommendations = () => {
             <h3 className="text-gray-400 text-sm font-medium">Process Improvements</h3>
             <TrendingUp className="h-5 w-5 text-blue-500" />
           </div>
-          <p className="text-2xl font-bold text-white">2</p>
+          <p className="text-2xl font-bold text-white">{recommendations.filter(r => r.category === 'Process Improvement').length}</p>
           <p className="text-sm text-blue-500 mt-2 flex items-center">
             <span>Efficiency opportunities</span>
           </p>
@@ -72,9 +140,9 @@ const Recommendations = () => {
             <h3 className="text-gray-400 text-sm font-medium">Cost Reduction</h3>
             <DollarSign className="h-5 w-5 text-green-500" />
           </div>
-          <p className="text-2xl font-bold text-white">$20,200</p>
+          <p className="text-2xl font-bold text-white">{recommendations.filter(r => r.category === 'Cost Reduction').length}</p>
           <p className="text-sm text-green-500 mt-2 flex items-center">
-            <span>Potential annual savings</span>
+            <span>Potential savings opportunities</span>
           </p>
         </div>
 
@@ -83,7 +151,7 @@ const Recommendations = () => {
             <h3 className="text-gray-400 text-sm font-medium">High Priority</h3>
             <AlertCircle className="h-5 w-5 text-yellow-500" />
           </div>
-          <p className="text-2xl font-bold text-white">3</p>
+          <p className="text-2xl font-bold text-white">{recommendations.filter(r => r.impact === 'High').length}</p>
           <p className="text-sm text-yellow-500 mt-2 flex items-center">
             <span>Require immediate attention</span>
           </p>
@@ -145,11 +213,15 @@ const Recommendations = () => {
             To maximize the benefits, we suggest implementing them in the following order:
           </p>
           <ol className="mt-4 space-y-2 pl-5 list-decimal text-gray-300">
-            <li>Tax Deduction Opportunity (before year-end)</li>
-            <li>Accounts Receivable Follow-up (immediate cash flow impact)</li>
-            <li>Review Vendor Contracts (as they come up for renewal)</li>
-            <li>Implement Cash Flow Forecasting (within next 30 days)</li>
-            <li>Optimize Accounts Payable Process (longer-term project)</li>
+            {recommendations
+              .sort((a, b) => {
+                if (a.impact === 'High' && b.impact !== 'High') return -1;
+                if (a.impact !== 'High' && b.impact === 'High') return 1;
+                return 0;
+              })
+              .map((rec, index) => (
+                <li key={rec.id}>{rec.title}</li>
+              ))}
           </ol>
           <div className="mt-4 p-3 bg-blue-900/20 rounded-lg border border-blue-800/30">
             <p className="text-sm text-blue-300">

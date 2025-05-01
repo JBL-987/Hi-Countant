@@ -67,7 +67,7 @@ persistent actor Filevault {
   system func postupgrade() {
     // Restore transactions from stable storage
     for ((principal, txs) in stableTransactions.vals()) {
-      HashMap.put(transactions, phash, principal, txs);
+      ignore HashMap.put(transactions, phash, principal, txs);
     };
   };
 

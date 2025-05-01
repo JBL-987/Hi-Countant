@@ -2022,13 +2022,21 @@ File name: ${fileName}`,
 
                   {activeSubTab === "analysis" && (
                     <Analysis
-                      transaction={transactions} 
+                      transactions={transactions} 
                     />
                   )}
 
-                  {activeSubTab === "reports" && <Reports />}
+                  {activeSubTab === "reports" && ( 
+                    <Reports 
+                    transactions={transactions} 
+                  />
+                  )}
 
-                  {activeSubTab === "recommendations" && <Recommendations />}
+                  {activeSubTab === "recommendations" && (
+                    <Recommendations 
+                    transactions={transactions} 
+                  />
+                  )}
                 </>
               )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, BarChart3, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { PieChart, BarChart3, TrendingUp, ArrowUpRight, ArrowDownRight, AlertCircle } from 'lucide-react';
 
 const Analysis = ({ transactions }) => {
   // State untuk menyimpan hasil analisis
@@ -8,16 +8,30 @@ const Analysis = ({ transactions }) => {
   const [monthlyTrends, setMonthlyTrends] = useState([]);
   const [expensesByCategory, setExpensesByCategory] = useState([]);
   const [anomalies, setAnomalies] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Effect untuk menganalisis transaksi ketika data berubah
   useEffect(() => {
     if (transactions && transactions.length > 0) {
-      analyzeTransactions(transactions);
+      try {
+        setIsLoading(true);
+        setError(null);
+        analyzeTransactions(transactions);
+      } catch (err) {
+        setError('Failed to analyze transactions: ' + err.message);
+      } finally {
+        setIsLoading(false);
+      }
     }
   }, [transactions]);
 
   // Fungsi untuk menganalisis transaksi
   const analyzeTransactions = (transactions) => {
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      throw new Error('No transactions to analyze');
+    }
+
     // Hitung total pendapatan dan pengeluaran
     const totalIncome = transactions
       .filter(t => t.transactionType === 'income')
@@ -27,10 +41,10 @@ const Analysis = ({ transactions }) => {
       .filter(t => t.transactionType === 'expense')
       .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount || 0)), 0);
 
-    // Hitung rasio keuangan yang sebenarnya
+    // Hitung rasio keuangan
     const profitMargin = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0;
     
-    // Hitung Current Ratio (Asset Lancar / Kewajiban Lancar)
+    // Hitung Current Ratio
     const currentAssets = transactions
       .filter(t => t.transactionType === 'income' || t.category === 'asset')
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
@@ -43,7 +57,7 @@ const Analysis = ({ transactions }) => {
       (currentAssets / currentLiabilities).toFixed(2) : 
       0;
 
-    // Hitung Debt Ratio (Total Hutang / Total Aset)
+    // Hitung Debt Ratio
     const totalDebts = transactions
       .filter(t => t.category === 'liability' || t.category === 'debt')
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
@@ -56,7 +70,7 @@ const Analysis = ({ transactions }) => {
       (totalDebts / totalAssets).toFixed(2) : 
       0;
 
-    // Hitung perubahan dari periode sebelumnya (misalnya bulan lalu)
+    // Hitung perubahan dari periode sebelumnya
     const currentDate = new Date();
     const lastMonthDate = new Date(currentDate.setMonth(currentDate.getMonth() - 1));
 
@@ -78,43 +92,46 @@ const Analysis = ({ transactions }) => {
 
     const profitMarginChange = (parseFloat(profitMargin) - parseFloat(lastMonthProfitMargin)).toFixed(1);
 
-    // Set financial ratios dengan perubahan yang dihitung
+    // Set financial ratios
     setFinancialRatios([
       {
         name: 'Current Ratio',
         value: currentRatio.toString(),
         change: `${currentRatio > 2 ? '+' : '-'}${Math.abs(currentRatio - 2).toFixed(2)}`,
-        status: currentRatio >= 2 ? 'positive' : 'negative'
+        status: currentRatio >= 2 ? 'positive' : 'negative',
+        description: 'Measures ability to pay short-term obligations'
       },
       {
         name: 'Profit Margin',
         value: `${profitMargin}%`,
         change: `${profitMarginChange > 0 ? '+' : ''}${profitMarginChange}%`,
-        status: profitMarginChange >= 0 ? 'positive' : 'negative'
+        status: profitMarginChange >= 0 ? 'positive' : 'negative',
+        description: 'Percentage of revenue that becomes profit'
       },
       {
         name: 'Debt Ratio',
         value: debtRatio.toString(),
         change: `${debtRatio <= 0.5 ? '-' : '+'}${Math.abs(debtRatio - 0.5).toFixed(2)}`,
-        status: debtRatio <= 0.5 ? 'positive' : 'negative'
+        status: debtRatio <= 0.5 ? 'positive' : 'negative',
+        description: 'Proportion of assets financed by debt'
       },
     ]);
 
-    // Hitung budget comparison berdasarkan data aktual
-    const averageMonthlyIncome = totalIncome / 12; // Asumsi data setahun
+    // Hitung budget comparison
+    const averageMonthlyIncome = totalIncome / 12;
     const averageMonthlyExpenses = totalExpenses / 12;
 
     setBudgetComparison([
       {
         category: 'Revenue',
-        budget: averageMonthlyIncome * 0.9, // Target 90% dari rata-rata
+        budget: averageMonthlyIncome * 0.9,
         actual: totalIncome,
         variance: totalIncome - (averageMonthlyIncome * 0.9),
         status: totalIncome >= (averageMonthlyIncome * 0.9) ? 'positive' : 'negative'
       },
       {
         category: 'Expenses',
-        budget: averageMonthlyExpenses * 1.1, // Target 110% dari rata-rata
+        budget: averageMonthlyExpenses * 1.1,
         actual: totalExpenses,
         variance: (averageMonthlyExpenses * 1.1) - totalExpenses,
         status: totalExpenses <= (averageMonthlyExpenses * 1.1) ? 'positive' : 'negative'
@@ -122,64 +139,61 @@ const Analysis = ({ transactions }) => {
     ]);
 
     // Hitung monthly trends
-    const calculateMonthlyTrends = () => {
-      const monthlyData = transactions.reduce((acc, t) => {
-        const month = new Date(t.date).toLocaleString('default', { month: 'long' });
-        if (!acc[month]) {
-          acc[month] = { income: 0, expenses: 0 };
-        }
-        if (t.transactionType === 'income') {
-          acc[month].income += parseFloat(t.amount || 0);
-        } else {
-          acc[month].expenses += parseFloat(t.amount || 0);
-        }
+    const monthlyData = transactions.reduce((acc, t) => {
+      const month = new Date(t.date).toLocaleString('default', { month: 'long' });
+      if (!acc[month]) {
+        acc[month] = { income: 0, expenses: 0 };
+      }
+      if (t.transactionType === 'income') {
+        acc[month].income += parseFloat(t.amount || 0);
+      } else {
+        acc[month].expenses += parseFloat(t.amount || 0);
+      }
+      return acc;
+    }, {});
+    
+    setMonthlyTrends(Object.entries(monthlyData).map(([month, data]) => ({
+      month,
+      income: data.income,
+      expenses: data.expenses,
+      profit: data.income - data.expenses
+    })));
+
+    // Analisis kategori pengeluaran
+    const categoryData = transactions
+      .filter(t => t.transactionType === 'expense')
+      .reduce((acc, t) => {
+        const category = t.category || 'Uncategorized';
+        acc[category] = (acc[category] || 0) + parseFloat(t.amount || 0);
         return acc;
       }, {});
-      
-      setMonthlyTrends(Object.entries(monthlyData).map(([month, data]) => ({
-        month,
-        income: data.income,
-        expenses: data.expenses,
-        profit: data.income - data.expenses
-      })));
-    };
 
-    const analyzeExpenseCategories = () => {
-      const categoryData = transactions
-        .filter(t => t.transactionType === 'expense')
-        .reduce((acc, t) => {
-          const category = t.category || 'Uncategorized';
-          acc[category] = (acc[category] || 0) + parseFloat(t.amount || 0);
-          return acc;
-        }, {});
+    setExpensesByCategory(
+      Object.entries(categoryData)
+        .map(([category, amount]) => ({
+          category,
+          amount,
+          percentage: (amount / totalExpenses * 100).toFixed(1)
+        }))
+        .sort((a, b) => b.amount - a.amount)
+    );
 
-      setExpensesByCategory(
-        Object.entries(categoryData)
-          .map(([category, amount]) => ({
-            category,
-            amount,
-            percentage: (amount / totalExpenses * 100).toFixed(1)
-          }))
-          .sort((a, b) => b.amount - a.amount)
-      );
-    };
+    // Deteksi anomali
+    const averageTransaction = totalExpenses / transactions.length;
+    const threshold = averageTransaction * 2;
 
-    const detectAnomalies = () => {
-      const averageTransaction = totalExpenses / transactions.length;
-      const threshold = averageTransaction * 2; // Transaksi 2x lebih besar dari rata-rata
+    const detectedAnomalies = transactions.filter(t => 
+      parseFloat(t.amount) > threshold
+    ).map(t => ({
+      date: t.date,
+      amount: t.amount,
+      description: t.description,
+      type: t.transactionType,
+      category: t.category,
+      reason: `Unusual ${t.transactionType} amount (${formatCurrency(t.amount)})`
+    }));
 
-      const detectedAnomalies = transactions.filter(t => 
-        parseFloat(t.amount) > threshold
-      ).map(t => ({
-        date: t.date,
-        amount: t.amount,
-        description: t.description,
-        type: t.transactionType,
-        reason: `Unusual ${t.transactionType} amount (${formatCurrency(t.amount)})`
-      }));
-
-      setAnomalies(detectedAnomalies);
-    };
+    setAnomalies(detectedAnomalies);
   };
 
   // Format currency
@@ -191,15 +205,35 @@ const Analysis = ({ transactions }) => {
     }).format(amount);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-900/20 rounded-lg p-4">
+        <div className="flex items-center">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+          <span className="text-red-400">{error}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-white">Financial Analysis</h1>
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-400">Last updated: Today</span>
+          <span className="text-sm text-gray-400">Last updated: {new Date().toLocaleDateString()}</span>
         </div>
       </div>
 
+      {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-gray-900 border border-blue-900/30 rounded-lg p-4 shadow-md">
           <div className="flex items-center justify-between mb-2">
@@ -238,11 +272,9 @@ const Analysis = ({ transactions }) => {
         </div>
       </div>
 
+      {/* Financial Ratios */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-        <h2 className="mb-6 text-xl font-bold text-white">
-          Financial Ratios
-        </h2>
-
+        <h2 className="mb-6 text-xl font-bold text-white">Financial Ratios</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {financialRatios.map((ratio, index) => (
             <div key={index} className="bg-gray-800 rounded-lg p-4">
@@ -259,16 +291,15 @@ const Analysis = ({ transactions }) => {
                   <span>{ratio.change}</span>
                 </p>
               </div>
+              <p className="text-xs text-gray-400 mt-2">{ratio.description}</p>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Budget vs Actual */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-        <h2 className="mb-6 text-xl font-bold text-white">
-          Budget vs. Actual
-        </h2>
-
+        <h2 className="mb-6 text-xl font-bold text-white">Budget vs. Actual</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -297,34 +328,9 @@ const Analysis = ({ transactions }) => {
         </div>
       </div>
 
+      {/* Monthly Trends */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-        <h2 className="mb-6 text-xl font-bold text-white">
-          Anomalies & Trends
-        </h2>
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="mb-4">
-            <h3 className="text-white text-md font-medium mb-2">Detected Anomalies</h3>
-            <p className="text-gray-300">
-              {transactions && transactions.length > 0 
-                ? "Analysis of transaction patterns shows no significant anomalies."
-                : "No transactions available for anomaly detection."}
-            </p>
-          </div>
-          <div>
-            <h3 className="text-white text-md font-medium mb-2">Positive Trends</h3>
-            <p className="text-gray-300">
-              {transactions && transactions.length > 0 
-                ? "Transaction analysis shows normal business operations."
-                : "No transactions available for trend analysis."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-        <h2 className="mb-6 text-xl font-bold text-white">
-          Monthly Trends
-        </h2>
+        <h2 className="mb-6 text-xl font-bold text-white">Monthly Trends</h2>
         <div className="space-y-4">
           {monthlyTrends.map((month, index) => (
             <div key={index} className="bg-gray-800 rounded-lg p-4">
@@ -356,10 +362,9 @@ const Analysis = ({ transactions }) => {
         </div>
       </div>
 
+      {/* Expense Categories */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-        <h2 className="mb-6 text-xl font-bold text-white">
-          Expense Categories
-        </h2>
+        <h2 className="mb-6 text-xl font-bold text-white">Expense Categories</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {expensesByCategory.map((category, index) => (
             <div key={index} className="bg-gray-800 rounded-lg p-4">
@@ -375,8 +380,9 @@ const Analysis = ({ transactions }) => {
         </div>
       </div>
 
+      {/* Anomalies */}
       {anomalies.length > 0 && (
-        <div className="bg-red-900/20 rounded-lg p-4 mt-4">
+        <div className="bg-red-900/20 rounded-lg p-4">
           <h3 className="text-red-400 font-medium mb-2">Detected Anomalies</h3>
           <div className="space-y-2">
             {anomalies.map((anomaly, index) => (
@@ -386,6 +392,7 @@ const Analysis = ({ transactions }) => {
                   <span className="text-red-400">{formatCurrency(anomaly.amount)}</span>
                 </div>
                 <p className="text-sm text-gray-400 mt-1">{anomaly.reason}</p>
+                <p className="text-xs text-gray-500 mt-1">Category: {anomaly.category}</p>
               </div>
             ))}
           </div>
