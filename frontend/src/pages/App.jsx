@@ -1794,9 +1794,19 @@ File name: ${fileName}`,
                     />
                   )}
 
-                  {activeSubTab === "validation" && <Validation />}
+                  {activeSubTab === "validation" && (
+                    <Validation 
+                      transactions={transactions}
+                      onViewTransaction={handleViewTransaction}
+                      onExportTransactions={handleExportTransactions}
+                    />
+                  )}
 
-                  {activeSubTab === "analysis" && <Analysis />}
+                  {activeSubTab === "analysis" && (
+                    <Analysis
+                      transaction={transactions} 
+                    />
+                  )}
 
                   {activeSubTab === "reports" && <Reports />}
 

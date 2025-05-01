@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Lightbulb, TrendingUp, DollarSign, AlertCircle, ChevronRight } from 'lucide-react';
 
 const Recommendations = () => {

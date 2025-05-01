@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FileText, Download, Printer, Share2 } from 'lucide-react';
 
 const Reports = () => {
