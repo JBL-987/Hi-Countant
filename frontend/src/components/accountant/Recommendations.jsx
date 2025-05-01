@@ -1,118 +1,112 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, TrendingUp, DollarSign, AlertCircle, ChevronRight } from 'lucide-react';
+import { Lightbulb, TrendingUp, DollarSign, AlertCircle, ChevronRight, Loader } from 'lucide-react';
 
 const Recommendations = ({ transactions }) => {
   const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (transactions && transactions.length > 0) {
-      const generatedRecommendations = generateRecommendations(transactions);
-      setRecommendations(generatedRecommendations);
+      setLoading(true);
+      const fetchRecommendations = async () => {
+        const recommendationsFromAPI = await recommendationsFromAI(transactions);
+        setRecommendations(recommendationsFromAPI);
+        setLoading(false);
+      };
+
+      fetchRecommendations();
     }
   }, [transactions]);
 
-  const generateRecommendations = (transactions) => {
-    const recommendations = [];
+  const recommendationsFromAI = async (transactions) => {
+    const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"
+    const prompt = `
+        You are a financial analysis assistant. You will receive a JSON array called “transactions” where each transaction has:
+    - transactionType: "income" or "expense"
+    - amount: number
+    - date: ISO date string
+    - category: string (for expenses)
+    - taxDeductible: boolean
+
+    Your task is to:
+    1. Analyze monthly cash flow and identify any months where expenses exceed income.
+    2. Categorize and rank expense categories by total spend.
+    3. Calculate the percentage of expenses that are tax-deductible.
+    4. Detect any transactions that significantly deviate (e.g., >2×) from the average transaction amount.
+    5. Identify recurring patterns or seasonality in cash flow.
+    6. Suggest additional “Revenue Generation” opportunities.
+    7. Recommend “Expense Reduction” strategies.
+    8. Propose “Cash Flow Optimization” tactics (e.g., invoicing terms, reserves).
+    9. Point out “Tax Optimization” moves.
+    10. Highlight any “Risk Management” or “Debt Management” considerations.
+
+    Return only a JSON array of recommendation objects, each with these fields:
+    - id: unique integer  
+    - title: short title  
+    - description: detailed actionable recommendation  
+    - impact: one of ["High", "Medium", "Low"]  
+    - category: one of ["Revenue Generation","Expense Reduction","Cash Flow Optimization","Tax Optimization","Risk Management","Debt Management"]  
+    - savings: brief note on expected savings or benefits  
     
-    // Analyze cash flow
-    const monthlyCashFlow = {};
-    transactions.forEach(transaction => {
-      const date = new Date(transaction.date);
-      const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    Example output format:
+    json
+    [
+      {
+        "id": 1,
+        "title": "Negotiate Longer Payment Terms",
+        "description": "Extend supplier payment terms from 30 to 60 days to improve cash liquidity during low-revenue months.",
+        "impact": "High",
+        "category": "Cash Flow Optimization",
+        "savings": "Improved working capital"
+      },
+      ...
+    ]
+
+    EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
+    `
+    // Call Gemini API
+    try{
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+           body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: prompt + "\n\nTransactions:\n" + JSON.stringify(transactions, null, 2) }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+            },
+          }),
+        });
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) return [];
       
-      if (!monthlyCashFlow[monthKey]) {
-        monthlyCashFlow[monthKey] = {
-          income: 0,
-          expenses: 0
-        };
+      const cleanedText = rawText.replace(/```json\s*|```/g, "").trim();
+
+      console.log("Gemini response:", cleanedText); 
+
+      try {
+        return JSON.parse(cleanedText);
+      } catch (err) {
+        console.error("Failed to parse Gemini response:", cleanedText);
+        return [];
       }
-
-      if (transaction.transactionType === 'income') {
-        monthlyCashFlow[monthKey].income += transaction.amount;
-      } else {
-        monthlyCashFlow[monthKey].expenses += transaction.amount;
-      }
-    });
-
-    // Check for cash flow issues
-    const cashFlowIssues = Object.entries(monthlyCashFlow).filter(([_, data]) => data.expenses > data.income);
-    if (cashFlowIssues.length > 0) {
-      recommendations.push({
-        id: 1,
-        title: 'Cash Flow Optimization Required',
-        description: `${cashFlowIssues.length} months show negative cash flow. Consider reviewing expenses and improving collection processes.`,
-        impact: 'High',
-        category: 'Cash Flow',
-        savings: 'Improve liquidity'
-      });
+    } catch (error){
+      console.error(error);
+      return [];
     }
-
-    // Analyze expense categories
-    const expenseCategories = {};
-    transactions
-      .filter(t => t.transactionType === 'expense')
-      .forEach(transaction => {
-        const category = transaction.category || 'Uncategorized';
-        if (!expenseCategories[category]) {
-          expenseCategories[category] = 0;
-        }
-        expenseCategories[category] += transaction.amount;
-      });
-
-    // Find largest expense category
-    const largestCategory = Object.entries(expenseCategories)
-      .sort((a, b) => b[1] - a[1])[0];
-
-    if (largestCategory) {
-      recommendations.push({
-        id: 2,
-        title: 'Review Largest Expense Category',
-        description: `${largestCategory[0]} is your largest expense category. Consider cost reduction strategies.`,
-        impact: 'Medium',
-        category: 'Cost Reduction',
-        savings: 'Potential savings in largest expense category'
-      });
-    }
-
-    // Check for tax optimization opportunities
-    const taxDeductibleExpenses = transactions
-      .filter(t => t.transactionType === 'expense' && t.taxDeductible)
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const totalExpenses = transactions
-      .filter(t => t.transactionType === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    if (taxDeductibleExpenses / totalExpenses < 0.7) {
-      recommendations.push({
-        id: 3,
-        title: 'Tax Deduction Optimization',
-        description: 'Less than 70% of expenses are tax-deductible. Review expense categorization for tax benefits.',
-        impact: 'High',
-        category: 'Tax Optimization',
-        savings: 'Potential tax savings'
-      });
-    }
-
-    // Check for irregular transactions
-    const averageTransaction = transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length;
-    const irregularTransactions = transactions.filter(t => 
-      Math.abs(t.amount) > averageTransaction * 2
-    );
-
-    if (irregularTransactions.length > 0) {
-      recommendations.push({
-        id: 4,
-        title: 'Irregular Transaction Review',
-        description: `${irregularTransactions.length} transactions significantly deviate from average. Review for potential issues.`,
-        impact: 'Medium',
-        category: 'Risk Management',
-        savings: 'Reduce financial risk'
-      });
-    }
-
-    return recommendations;
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -162,7 +156,12 @@ const Recommendations = ({ transactions }) => {
         <h2 className="mb-6 text-xl font-bold text-white">
           AI-Generated Recommendations
         </h2>
-
+        {loading ? (
+          <div className="flex flex-col justify-center items-center py-10 space-y-2">
+            <Loader className="animate-spin text-white h-6 w-6" />
+            <div className="text-white text-sm">Analyzing with Gemini AI...</div>
+          </div>
+        ) : (
         <div className="space-y-4">
           {recommendations.map((recommendation) => (
             <div key={recommendation.id} className="bg-gray-800 rounded-lg p-4 hover:bg-gray-800/80 transition-colors">
@@ -201,6 +200,7 @@ const Recommendations = ({ transactions }) => {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
@@ -212,6 +212,12 @@ const Recommendations = ({ transactions }) => {
             Our AI has analyzed your financial data and business operations to generate these recommendations. 
             To maximize the benefits, we suggest implementing them in the following order:
           </p>
+          {loading ? (
+            <div className="flex flex-col justify-center items-center py-10 space-y-2">
+              <Loader className="animate-spin text-white h-6 w-6" />
+              <div className="text-white text-sm">Analyzing with Gemini AI...</div>
+            </div>
+          ) : (
           <ol className="mt-4 space-y-2 pl-5 list-decimal text-gray-300">
             {recommendations
               .sort((a, b) => {
@@ -223,6 +229,7 @@ const Recommendations = ({ transactions }) => {
                 <li key={rec.id}>{rec.title}</li>
               ))}
           </ol>
+          )}
           <div className="mt-4 p-3 bg-blue-900/20 rounded-lg border border-blue-800/30">
             <p className="text-sm text-blue-300">
               <strong>Pro Tip:</strong> Schedule a meeting with your team to review these recommendations and assign responsibilities for implementation.
