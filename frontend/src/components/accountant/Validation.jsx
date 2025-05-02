@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardCheck, CheckCircle, AlertTriangle, Download, Filter } from 'lucide-react';
+import { ClipboardCheck, CheckCircle, AlertTriangle, Download } from 'lucide-react';
 
 const Validation = ({ 
   transactions,

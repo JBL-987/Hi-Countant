@@ -13,7 +13,7 @@ const Navbar_Component = ({ isAuthenticated, logout }) => {
     <nav className="bg-black/80 backdrop-blur-md fixed w-full z-50 top-0 start-0 border-b border-blue-900/30 shadow-lg">
       <div className="max-w-7xl flex flex-wrap items-center justify-between mx-auto p-4">
         <div className="flex items-center space-x-3 rtl:space-x-reverse">
-          <a href="/">
+          <a href="/" className="flex items-center space-x-2">
             <Logo className="h-8 w-8" />
             <span className="self-center text-2xl font-bold whitespace-nowrap text-white bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
               Hi! Countant

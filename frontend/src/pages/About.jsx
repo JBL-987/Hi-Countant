@@ -26,10 +26,10 @@ export default function About() {
           <h2 className="text-3xl font-bold mb-8 bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">Company Overview</h2>
           <div className="prose prose-lg max-w-none text-gray-300">
             <p>
-              Hi! Countant is a pioneering fintech company founded in 2023 that combines advanced artificial intelligence with blockchain technology to revolutionize accounting and financial management for businesses of all sizes.
+              Hi! Countant is a pioneering fintech company founded in 2025 that combines advanced artificial intelligence with blockchain technology to revolutionize accounting and financial management for businesses of all sizes.
             </p>
             <p className="mt-4">
-              Based in San Francisco with team members across the globe, we've grown from a small startup to a trusted financial technology provider serving thousands of businesses worldwide. Our platform securely manages financial data while providing the insights needed for informed business decisions.
+              Based in Indonesia with team members across the globe, we've grown from a small startup to a trusted financial technology provider serving thousands of businesses worldwide. Our platform securely manages financial data while providing the insights needed for informed business decisions.
             </p>
             <p className="mt-4">
               Our diverse team brings together expertise in accounting, artificial intelligence, blockchain technology, and user experience design to create solutions that are both powerful and accessible.
