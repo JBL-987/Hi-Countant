@@ -2012,13 +2012,31 @@ File name: ${fileName}`,
                     />
                   )}
 
-                  {activeSubTab === "validation" && <Validation />}
+                  {activeSubTab === "validation" && (
+                    <Validation 
+                      transactions={transactions}
+                      onViewTransaction={handleViewTransaction}
+                      onExportTransactions={handleExportTransactions}
+                    />
+                  )}
 
-                  {activeSubTab === "analysis" && <Analysis />}
+                  {activeSubTab === "analysis" && (
+                    <Analysis
+                      transactions={transactions} 
+                    />
+                  )}
 
-                  {activeSubTab === "reports" && <Reports />}
+                  {activeSubTab === "reports" && ( 
+                    <Reports 
+                    transactions={transactions} 
+                  />
+                  )}
 
-                  {activeSubTab === "recommendations" && <Recommendations />}
+                  {activeSubTab === "recommendations" && (
+                    <Recommendations 
+                    transactions={transactions} 
+                  />
+                  )}
                 </>
               )}
 

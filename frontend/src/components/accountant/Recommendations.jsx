@@ -1,57 +1,119 @@
-import React from 'react';
-import { Lightbulb, TrendingUp, DollarSign, AlertCircle, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lightbulb, TrendingUp, DollarSign, AlertCircle, ChevronRight, Loader } from 'lucide-react';
 
-const Recommendations = () => {
-  // Sample recommendations
-  const recommendations = [
-    { 
-      id: 1, 
-      title: 'Optimize Accounts Payable Process', 
-      description: 'Implement automated invoice processing to reduce manual data entry and improve accuracy.',
-      impact: 'High',
-      category: 'Process Improvement',
-      savings: '$5,000 annually'
-    },
-    { 
-      id: 2, 
-      title: 'Review Vendor Contracts', 
-      description: 'Several vendor contracts are due for renewal. Negotiate better terms based on your payment history.',
-      impact: 'Medium',
-      category: 'Cost Reduction',
-      savings: '$3,200 annually'
-    },
-    { 
-      id: 3, 
-      title: 'Implement Cash Flow Forecasting', 
-      description: 'Set up a 13-week cash flow forecast to better anticipate cash needs and optimize working capital.',
-      impact: 'High',
-      category: 'Financial Planning',
-      savings: 'Improved liquidity'
-    },
-    { 
-      id: 4, 
-      title: 'Tax Deduction Opportunity', 
-      description: 'Recent equipment purchases qualify for Section 179 deduction. Consult with tax advisor before year-end.',
-      impact: 'High',
-      category: 'Tax Optimization',
-      savings: '$12,000 tax savings'
-    },
-    { 
-      id: 5, 
-      title: 'Accounts Receivable Follow-up', 
-      description: 'Implement a structured follow-up process for overdue invoices to improve collection time.',
-      impact: 'Medium',
-      category: 'Cash Flow',
-      savings: 'Reduce DSO by 5 days'
-    },
-  ];
+const Recommendations = ({ transactions }) => {
+  const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (transactions && transactions.length > 0) {
+      setLoading(true);
+      const fetchRecommendations = async () => {
+        const recommendationsFromAPI = await recommendationsFromAI(transactions);
+        setRecommendations(recommendationsFromAPI);
+        setLoading(false);
+      };
+
+      fetchRecommendations();
+    }
+  }, [transactions]);
+
+  const recommendationsFromAI = async (transactions) => {
+    const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"
+    const prompt = `
+        You are a financial analysis assistant. You will receive a JSON array called “transactions” where each transaction has:
+    - transactionType: "income" or "expense"
+    - amount: number
+    - date: ISO date string
+    - category: string (for expenses)
+    - taxDeductible: boolean
+
+    Your task is to:
+    1. Analyze monthly cash flow and identify any months where expenses exceed income.
+    2. Categorize and rank expense categories by total spend.
+    3. Calculate the percentage of expenses that are tax-deductible.
+    4. Detect any transactions that significantly deviate (e.g., >2×) from the average transaction amount.
+    5. Identify recurring patterns or seasonality in cash flow.
+    6. Suggest additional “Revenue Generation” opportunities.
+    7. Recommend “Expense Reduction” strategies.
+    8. Propose “Cash Flow Optimization” tactics (e.g., invoicing terms, reserves).
+    9. Point out “Tax Optimization” moves.
+    10. Highlight any “Risk Management” or “Debt Management” considerations.
+
+    Return only a JSON array of recommendation objects, each with these fields:
+    - id: unique integer  
+    - title: short title  
+    - description: detailed actionable recommendation  
+    - impact: one of ["High", "Medium", "Low"]  
+    - category: one of ["Revenue Generation","Expense Reduction","Cash Flow Optimization","Tax Optimization","Risk Management","Debt Management"]  
+    - savings: brief note on expected savings or benefits  
+    
+    Example output format:
+    json
+    [
+      {
+        "id": 1,
+        "title": "Negotiate Longer Payment Terms",
+        "description": "Extend supplier payment terms from 30 to 60 days to improve cash liquidity during low-revenue months.",
+        "impact": "High",
+        "category": "Cash Flow Optimization",
+        "savings": "Improved working capital"
+      },
+      ...
+    ]
+
+    EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
+    `
+    // Call Gemini API
+    try{
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+           body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: prompt + "\n\nTransactions:\n" + JSON.stringify(transactions, null, 2) }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 8192,
+            },
+          }),
+        });
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) return [];
+      
+      const cleanedText = rawText.replace(/```json\s*|```/g, "").trim();
+
+      console.log("Gemini response:", cleanedText); 
+
+      try {
+        return JSON.parse(cleanedText);
+      } catch (err) {
+        console.error("Failed to parse Gemini response:", cleanedText);
+        return [];
+      }
+    } catch (error){
+      console.error(error);
+      return [];
+    }
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-white">Recommendations</h1>
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-400">Last updated: Today</span>
+          <span className="text-sm text-gray-400">Last updated: {new Date().toLocaleDateString()}</span>
         </div>
       </div>
 
@@ -61,7 +123,7 @@ const Recommendations = () => {
             <h3 className="text-gray-400 text-sm font-medium">Process Improvements</h3>
             <TrendingUp className="h-5 w-5 text-blue-500" />
           </div>
-          <p className="text-2xl font-bold text-white">2</p>
+          <p className="text-2xl font-bold text-white">{recommendations.filter(r => r.category === 'Process Improvement').length}</p>
           <p className="text-sm text-blue-500 mt-2 flex items-center">
             <span>Efficiency opportunities</span>
           </p>
@@ -72,9 +134,9 @@ const Recommendations = () => {
             <h3 className="text-gray-400 text-sm font-medium">Cost Reduction</h3>
             <DollarSign className="h-5 w-5 text-green-500" />
           </div>
-          <p className="text-2xl font-bold text-white">$20,200</p>
+          <p className="text-2xl font-bold text-white">{recommendations.filter(r => r.category === 'Cost Reduction').length}</p>
           <p className="text-sm text-green-500 mt-2 flex items-center">
-            <span>Potential annual savings</span>
+            <span>Potential savings opportunities</span>
           </p>
         </div>
 
@@ -83,7 +145,7 @@ const Recommendations = () => {
             <h3 className="text-gray-400 text-sm font-medium">High Priority</h3>
             <AlertCircle className="h-5 w-5 text-yellow-500" />
           </div>
-          <p className="text-2xl font-bold text-white">3</p>
+          <p className="text-2xl font-bold text-white">{recommendations.filter(r => r.impact === 'High').length}</p>
           <p className="text-sm text-yellow-500 mt-2 flex items-center">
             <span>Require immediate attention</span>
           </p>
@@ -94,7 +156,12 @@ const Recommendations = () => {
         <h2 className="mb-6 text-xl font-bold text-white">
           AI-Generated Recommendations
         </h2>
-
+        {loading ? (
+          <div className="flex flex-col justify-center items-center py-10 space-y-2">
+            <Loader className="animate-spin text-white h-6 w-6" />
+            <div className="text-white text-sm">Analyzing with Gemini AI...</div>
+          </div>
+        ) : (
         <div className="space-y-4">
           {recommendations.map((recommendation) => (
             <div key={recommendation.id} className="bg-gray-800 rounded-lg p-4 hover:bg-gray-800/80 transition-colors">
@@ -133,6 +200,7 @@ const Recommendations = () => {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
@@ -144,13 +212,24 @@ const Recommendations = () => {
             Our AI has analyzed your financial data and business operations to generate these recommendations. 
             To maximize the benefits, we suggest implementing them in the following order:
           </p>
+          {loading ? (
+            <div className="flex flex-col justify-center items-center py-10 space-y-2">
+              <Loader className="animate-spin text-white h-6 w-6" />
+              <div className="text-white text-sm">Analyzing with Gemini AI...</div>
+            </div>
+          ) : (
           <ol className="mt-4 space-y-2 pl-5 list-decimal text-gray-300">
-            <li>Tax Deduction Opportunity (before year-end)</li>
-            <li>Accounts Receivable Follow-up (immediate cash flow impact)</li>
-            <li>Review Vendor Contracts (as they come up for renewal)</li>
-            <li>Implement Cash Flow Forecasting (within next 30 days)</li>
-            <li>Optimize Accounts Payable Process (longer-term project)</li>
+            {recommendations
+              .sort((a, b) => {
+                if (a.impact === 'High' && b.impact !== 'High') return -1;
+                if (a.impact !== 'High' && b.impact === 'High') return 1;
+                return 0;
+              })
+              .map((rec, index) => (
+                <li key={rec.id}>{rec.title}</li>
+              ))}
           </ol>
+          )}
           <div className="mt-4 p-3 bg-blue-900/20 rounded-lg border border-blue-800/30">
             <p className="text-sm text-blue-300">
               <strong>Pro Tip:</strong> Schedule a meeting with your team to review these recommendations and assign responsibilities for implementation.
