@@ -25,7 +25,11 @@ export default function Home({ isAuthenticated, login }) {
           text: "Something went wrong!",
         });
       }
-    };
+  };
+  
+  const about = () => {
+    navigate("/About");
+  }
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -110,7 +114,9 @@ export default function Home({ isAuthenticated, login }) {
                 className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-lg font-medium hover:opacity-90 transition-all transform hover:scale-105">
                 Get Started
               </button>
-              <button className="px-8 py-4 bg-transparent border-2 border-white/30 rounded-lg text-lg font-medium hover:bg-white/10 transition-all">
+              <button
+                onClick={about}
+                className="px-8 py-4 bg-transparent border-2 border-white/30 rounded-lg text-lg font-medium hover:bg-white/10 transition-all">
                 Learn More
               </button>
             </div>

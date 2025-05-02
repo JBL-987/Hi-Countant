@@ -39,7 +39,7 @@ const Analysis = ({ transactions }) => {
 
     const totalExpenses = transactions
       .filter(t => t.transactionType === 'expense')
-      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount || 0)), 0);
+      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
     // Hitung rasio keuangan
     const profitMargin = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0;
@@ -84,7 +84,7 @@ const Analysis = ({ transactions }) => {
 
     const lastMonthExpenses = lastMonthTransactions
       .filter(t => t.transactionType === 'expense')
-      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount || 0)), 0);
+      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
     const lastMonthProfitMargin = lastMonthIncome > 0 ? 
       ((lastMonthIncome - lastMonthExpenses) / lastMonthIncome * 100).toFixed(1) : 

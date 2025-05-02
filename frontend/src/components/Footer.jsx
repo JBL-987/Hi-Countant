@@ -1,8 +1,9 @@
 import React from "react";
-import { Github, Twitter, Linkedin, Mail } from "lucide-react";
+import { Github } from "lucide-react";
+import { Link } from "react-router-dom";
 import Logo from "./Logo";
 
-const Footer_Component = () => {
+const Footer_Component = ({ isAuthenticated }) => {
   return (
     <footer className="bg-black border-t border-blue-900/30">
       <div className="w-full max-w-7xl mx-auto p-8 md:py-12">
@@ -20,171 +21,159 @@ const Footer_Component = () => {
             </p>
             <div className="flex space-x-4">
               <a
-                href="#"
+                href="https://github.com/JBL-987/Hi-Countant"
                 className="text-gray-400 hover:text-blue-400 transition-colors"
               >
-                <Github size={20} />
-              </a>
-              <a
-                href="#"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-              >
-                <Twitter size={20} />
-              </a>
-              <a
-                href="#"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-              >
-                <Linkedin size={20} />
-              </a>
-              <a
-                href="#"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-              >
-                <Mail size={20} />
+                 <Github size={20} />
               </a>
             </div>
           </div>
 
-          <div>
-            <h4 className="text-white font-semibold mb-4">Product</h4>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Features
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Pricing
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Documentation
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Roadmap
-                </a>
-              </li>
-            </ul>
-          </div>
+          {isAuthenticated ? (
+            <>
+              <div>
+                <h4 className="text-white font-semibold mb-4">Product</h4>
+                <ul className="space-y-2">
+                  <li>
+                    <Link
+                      to="/Features"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Features
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Pricing"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Pricing
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Documentation"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Documentation
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Roadmap"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Roadmap
+                    </Link>
+                  </li>
+                </ul>
+              </div>
 
-          <div>
-            <h4 className="text-white font-semibold mb-4">Company</h4>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  About
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Blog
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Careers
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Contact
-                </a>
-              </li>
-            </ul>
-          </div>
+              <div>
+                <h4 className="text-white font-semibold mb-4">Company</h4>
+                <ul className="space-y-2">
+                  <li>
+                    <Link
+                      to="/About"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      About
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Blog"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Blog
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Careers"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Careers
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Contact"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Contact
+                    </Link>
+                  </li>
+                </ul>
+              </div>
 
-          <div>
-            <h4 className="text-white font-semibold mb-4">Legal</h4>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Privacy Policy
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Terms of Service
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  Cookie Policy
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  GDPR
-                </a>
-              </li>
-            </ul>
-          </div>
+              <div>
+                <h4 className="text-white font-semibold mb-4">Legal</h4>
+                <ul className="space-y-2">
+                  <li>
+                    <Link
+                      to="/Privacypolicy"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Privacy Policy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Termofservices"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Terms of Service
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/Cookiepolicy"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      Cookie Policy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/GDPR"
+                      className="text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      GDPR
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="border-t border-blue-900/30 pt-8 flex flex-col md:flex-row justify-between items-center">
           <span className="text-sm text-gray-400 mb-4 md:mb-0">
             © 2025 Hi! Countant™. All Rights Reserved.
           </span>
-          <div className="flex space-x-6">
-            <a
-              href="#"
-              className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
-            >
-              Privacy
-            </a>
-            <a
-              href="#"
-              className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
-            >
-              Terms
-            </a>
-            <a
-              href="#"
-              className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
-            >
-              Cookies
-            </a>
-          </div>
+          {!isAuthenticated ? (
+            <div className="flex space-x-6">
+              <Link
+                to="/Privacypolicy"
+                className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+              >
+                Privacy
+              </Link>
+              <Link
+                to="/Termofservices"
+                className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+              >
+                Terms
+              </Link>
+              <Link
+                to="/Cookiepolicy"
+                className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+              >
+                Cookies
+              </Link>
+            </div>
+          ) : (null)}
         </div>
       </div>
     </footer>

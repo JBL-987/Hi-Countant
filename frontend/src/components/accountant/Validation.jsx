@@ -69,10 +69,6 @@ const Validation = ({
     }
 
     // 5. Consistency Validation
-    if (transaction.transactionType === 'expense' && parseFloat(transaction.amount) > 0) {
-      messages.push('Expense amount must be negative');
-      status = 'error';
-    }
     if (transaction.transactionType === 'income' && parseFloat(transaction.amount) < 0) {
       messages.push('Income amount must be positive');
       status = 'error';
@@ -134,6 +130,10 @@ const Validation = ({
   const validCount = validationResults.filter(item => item.status === 'valid').length;
   const warningCount = validationResults.filter(item => item.status === 'warning').length;
   const errorCount = validationResults.filter(item => item.status === 'error').length;
+
+  const totalExpenses = transactions
+    .filter(t => t.transactionType === 'expense')
+    .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount || 0)), 0);
 
   return (
     <div className="space-y-6">

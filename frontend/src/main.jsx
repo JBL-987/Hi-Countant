@@ -13,6 +13,18 @@ import Navbar_Component from "./components/Navbar";
 import Footer_Component from "./components/Footer";
 import Home from "./pages/Home";
 import App from "./pages/App";
+import About from "./pages/About";
+import Blog from "./pages/Blog";
+import Careers from "./pages/Careers";
+import Documentation from "./pages/Documentation";
+import Contact from "./pages/Contact";
+import Cookiepolicy from "./pages/Cookiepolicy";
+import Features from "./pages/Features";
+import GDPR from "./pages/GDPR";
+import Pricing from "./pages/Pricing";
+import Roadmap from "./pages/Roadmap";
+import Termoservices from "./pages/Termsofservices";
+import Privacypolicy from "./pages/Privacypolicy";
 import "../index.css";
 
 const network = process.env.DFX_NETWORK;
@@ -37,12 +49,10 @@ function Main() {
 
         if (isLoggedIn) {
           try {
-            // Check if the identity is valid and not expired
             const identity = client.getIdentity();
             const delegations = identity.getDelegation().delegations;
 
             if (delegations && delegations.length > 0) {
-              // Convert expiration from nanoseconds to milliseconds and compare with current time
               const expirationTime = delegations[0].delegation.expiration;
               const expirationMs = Number(expirationTime) / 1000000;
               const currentTimeMs = Date.now();
@@ -53,11 +63,9 @@ function Main() {
                 isLoggedIn = false;
               } else {
                 console.log("Identity valid until:", new Date(expirationMs));
-                // Create actor with the valid identity
                 const newActor = createActor(canisterId, {
                   agentOptions: {
                     identity,
-                    // Disable certificate validation in development
                     ...(process.env.NODE_ENV !== "production" && {
                       fetchRootKey: true,
                       verifyQuerySignatures: false,
@@ -69,7 +77,6 @@ function Main() {
             }
           } catch (e) {
             console.warn("Error checking identity expiration:", e);
-            // If there's an error checking expiration, log out to be safe
             await client.logout();
             isLoggedIn = false;
           }
@@ -90,11 +97,9 @@ function Main() {
     if (!authClient) return;
 
     try {
-      // First check if we're already authenticated but certificate is expired
       if (await authClient.isAuthenticated()) {
         try {
-          // Try to refresh the session
-          await authClient.logout(); // Clear the expired session
+          await authClient.logout(); 
           console.log("Cleared expired session, logging in again...");
         } catch (e) {
           console.warn("Error clearing expired session:", e);
@@ -103,14 +108,12 @@ function Main() {
 
       await authClient.login({
         identityProvider,
-        // Set a longer session duration (7 days in nanoseconds)
         maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000),
         onSuccess: async () => {
           const identity = authClient.getIdentity();
           const newActor = createActor(canisterId, {
             agentOptions: {
               identity,
-              // Disable certificate validation in development
               ...(process.env.NODE_ENV !== "production" && {
                 fetchRootKey: true,
                 verifyQuerySignatures: false,
@@ -135,8 +138,6 @@ function Main() {
       setIsAuthenticated(false);
       setActor(null);
 
-      // Force page reload to clear any cached state
-      // This helps prevent issues with expired certificates
       if (process.env.NODE_ENV !== "production") {
         console.log("Reloading page to clear session state...");
         setTimeout(() => {
@@ -145,7 +146,6 @@ function Main() {
       }
     } catch (error) {
       console.error("Logout failed:", error);
-      // Even if logout fails, reset the local state
       setIsAuthenticated(false);
       setActor(null);
     }
@@ -171,7 +171,6 @@ function Main() {
     <Router>
       <Navbar_Component
         isAuthenticated={isAuthenticated}
-        login={login}
         logout={logout}
       />
       <Routes>
@@ -189,9 +188,21 @@ function Main() {
             </ProtectedRoute>
           }
         />
+        <Route path="/Features" element={<Features />} />
+        <Route path="/Pricing" element={<Pricing />} />
+        <Route path="/Documentation" element={<Documentation />} />
+        <Route path="/Roadmap" element={<Roadmap />} />
+        <Route path="/About" element={<About/>} />
+        <Route path="/Blog" element={<Blog />} />
+        <Route path="/Careers" element={<Careers />} />
+        <Route path="/Contact" element={<Contact />} />
+        <Route path="/Privacypolicy" element={<Privacypolicy />} />
+        <Route path="/Termofservices" element={<Termoservices />} />
+        <Route path="/Cookiepolicy" element={<Cookiepolicy />} />
+        <Route path="/GDPR" element={<GDPR />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <Footer_Component />
+      <Footer_Component  isAuthenticated={isAuthenticated} />
     </Router>
   );
 }

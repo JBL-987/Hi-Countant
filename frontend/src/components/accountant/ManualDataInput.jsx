@@ -163,8 +163,9 @@ const ManualDataInput = ({ onSaveData }) => {
         .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
 
       // Use either the main amount or the sum of line items
-      const finalAmount =
-        lineItemsTotal > 0 ? lineItemsTotal : parseFloat(formData.amount);
+      const finalAmount = Math.abs(
+        lineItemsTotal > 0 ? lineItemsTotal : parseFloat(formData.amount)
+      );
 
       // Prepare data for saving
       const dataToSave = {
