@@ -3,10 +3,13 @@ import { FileText, Download, Printer, Share2, Loader2 } from 'lucide-react';
 
 const Reports = ({ transactions }) => {
   const [financialStatements, setFinancialStatements] = useState([]);
-  const [balanceSheet, setBalanceSheet] = useState([]);
-  const [incomeStatement, setIncomeStatement] = useState([]);
-  const [cashFlowStatement, setCashFlowStatement] = useState([]);
   const [taxReports, setTaxReports] = useState([]);
+  const [balanceSheet, setBalanceSheet] = useState({});
+  const [incomeStatement, setIncomeStatement] = useState({});
+  const [cashFlowStatement, setCashFlowStatement] = useState({});
+  const [quarterlyTaxSummary, setQuarterlyTaxSummary] = useState({});
+  const [annualTaxReport, setAnnualTaxReport] = useState({});
+  const [salesTaxReport, setSalesTaxReport] = useState({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -14,21 +17,30 @@ const Reports = ({ transactions }) => {
       const fetchFinancialData = async () => {
         setLoading(true);
         const statements = await recommendationsFromAI(dummyData);
-        if (statements && statements.length > 0) {
-          const [balanceData, incomeData, cashFlowData] = statements;
-
+        if (statements && statements.length === 6) {
+          const [ balanceData, incomeData, cashFlowData, quarterlyTaxData, annualTaxData, salesTaxData ] = statements;
+  
           setBalanceSheet(balanceData?.balance_sheet || {});
           setIncomeStatement(incomeData?.income_statement || {});
           setCashFlowStatement(cashFlowData?.cash_flow_statement || {});
+          setQuarterlyTaxSummary(quarterlyTaxData?.quarterly_tax_summary || {});
+          setAnnualTaxReport(annualTaxData?.annual_tax_report || {});
+          setSalesTaxReport(salesTaxData?.sales_tax_report || {});
+  
           setFinancialStatements([
             balanceData?.balance_sheet,
             incomeData?.income_statement,
             cashFlowData?.cash_flow_statement,
           ]);
+          setTaxReports([
+            quarterlyTaxData?.quarterly_tax_summary,
+            annualTaxData?.annual_tax_report,
+            salesTaxData?.sales_tax_report
+          ]);
           setLoading(false);
         }
       };
-
+  
       fetchFinancialData();
     }
   }, [transactions]);
@@ -182,7 +194,7 @@ const Reports = ({ transactions }) => {
   const recommendationsFromAI = async (transactions) => {
     const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"
     const prompt = `
-          You are a financial assistant AI. You will receive a JSON object containing detailed financial information for a company. The input data will include the following sections:
+      You are a financial assistant AI. You will receive a JSON object containing detailed financial information for a company. The input data will include the following sections:
       1. Business Information:
         - name
         - fiscal year
@@ -209,8 +221,8 @@ const Reports = ({ transactions }) => {
         - relevant tax details
       8. Financial Ratios:
         - liquidity, profitability, etc.
-
-      Your task is to analyze this input and return an array of three structured JSON objects representing the following financial statements:
+      
+      Your task is to analyze this input and return an array of **six** structured JSON objects representing the following financial statements and reports:
       
       1. **Balance Sheet**:
         Fields:
@@ -229,7 +241,7 @@ const Reports = ({ transactions }) => {
           - owner_equity
           - retained_earnings
           - total_equity
-
+      
       2. **Income Statement**:
         Fields:
         - period: the reporting month in YYYY-MM format (e.g., "2025-04")
@@ -244,7 +256,7 @@ const Reports = ({ transactions }) => {
           - supplies
           - total_expenses
         - net_income: calculated as total revenue - total expenses
-
+      
       3. **Cash Flow Statement**:
         Fields:
         - period: the reporting month in YYYY-MM format
@@ -261,17 +273,38 @@ const Reports = ({ transactions }) => {
           - owner_draw
           - net_cash_from_financing
         - net_cash_flow: sum of operating + investing + financing
-
+      
+      4. **Quarterly Tax Summary**:
+        Fields:
+        - quarter: e.g., "Q2"
+        - tax_liability
+        - tax_paid
+        - tax_due: tax_liability - tax_paid
+      
+      5. **Annual Tax Report**:
+        Fields:
+        - fiscal_year
+        - total_tax_liability
+        - total_tax_paid
+        - carryforward_amount
+        - tax_status
+      
+      6. **Sales Tax Report**:
+        Fields:
+        - sales_revenue
+        - sales_tax_collected
+        - sales_tax_due
+      
       **Rules**:
       - Use fields from the input data and map them intelligently to the specified categories.
       - Rename keys where necessary to ensure standardization.
       - Ensure realistic approximations or conversions, such as converting "App Maintenance" and "Consulting" to "service_income".
       - Ensure values match the logic and numbers from the original input.
-
+      
       **EXTREMELY IMPORTANT**: Your response must ONLY contain the raw JSON array, starting with [ and ending with ]. Do not include any explanation, markdown formatting, or surrounding text. Just return the raw JSON array.
-
+      
       Example Output Format:
-
+      
       [
         {
           "balance_sheet": {
@@ -333,9 +366,34 @@ const Reports = ({ transactions }) => {
             },
             "net_cash_flow": 1750
           }
+        },
+        {
+          "quarterly_tax_summary": {
+            "quarter": "Q2",
+            "tax_liability": 1300,
+            "tax_paid": 1000,
+            "tax_due": 300
+          }
+        },
+        {
+          "annual_tax_report": {
+            "fiscal_year": "2024",
+            "total_tax_liability": 5200,
+            "total_tax_paid": 5000,
+            "carryforward_amount": 200,
+            "tax_status": "Partially Paid"
+          }
+        },
+        {
+          "sales_tax_report": {
+            "sales_revenue": 4500,
+            "sales_tax_collected": 450,
+            "sales_tax_due": 450
+          }
         }
       ]
-    `
+    `;
+    
     // Call Gemini API
     try{
       const response = await fetch(
@@ -373,86 +431,6 @@ const Reports = ({ transactions }) => {
       return [];
     }
   }
-  
-  const generateFinancialStatements = (transactions) => {
-    // Group transactions by quarter
-    const quarters = {};
-    transactions.forEach(transaction => {
-      const date = new Date(transaction.date);
-      const quarter = Math.floor(date.getMonth() / 3) + 1;
-      const year = date.getFullYear();
-      const quarterKey = `Q${quarter} ${year}`;
-      
-      if (!quarters[quarterKey]) {
-        quarters[quarterKey] = {
-          income: 0,
-          expenses: 0,
-          date: transaction.date
-        };
-      }
-
-      if (transaction.transactionType === 'income') {
-        quarters[quarterKey].income += transaction.amount;
-      } else {
-        quarters[quarterKey].expenses += transaction.amount;
-      }
-    });
-
-    // Convert to array format
-    return Object.entries(quarters).map(([period, data], index) => ({
-      id: index + 1,
-      name: 'Financial Statement',
-      period: period,
-      date: data.date,
-      status: 'final',
-      data: {
-        income: data.income,
-        expenses: data.expenses,
-        profit: data.income - data.expenses
-      }
-    }));
-  };
-
-  const generateTaxReports = (transactions) => {
-    // Group transactions by quarter and calculate tax-related amounts
-    const quarters = {};
-    transactions.forEach(transaction => {
-      const date = new Date(transaction.date);
-      const quarter = Math.floor(date.getMonth() / 3) + 1;
-      const year = date.getFullYear();
-      const quarterKey = `Q${quarter} ${year}`;
-      
-      if (!quarters[quarterKey]) {
-        quarters[quarterKey] = {
-          taxableIncome: 0,
-          taxDeductibleExpenses: 0,
-          date: transaction.date,
-          dueDate: new Date(year, (quarter * 3) + 1, 15).toISOString().split('T')[0]
-        };
-      }
-
-      if (transaction.transactionType === 'income') {
-        quarters[quarterKey].taxableIncome += transaction.amount;
-      } else if (transaction.taxDeductible) {
-        quarters[quarterKey].taxDeductibleExpenses += transaction.amount;
-      }
-    });
-
-    // Convert to array format
-    return Object.entries(quarters).map(([period, data], index) => ({
-      id: index + 1,
-      name: 'Tax Report',
-      period: period,
-      date: data.date,
-      dueDate: data.dueDate,
-      status: 'ready',
-      data: {
-        taxableIncome: data.taxableIncome,
-        taxDeductibleExpenses: data.taxDeductibleExpenses,
-        estimatedTax: (data.taxableIncome - data.taxDeductibleExpenses) * 0.25 // Assuming 25% tax rate
-      }
-    }));
-  };
 
   // Format date
   const formatDate = (dateString) => {
@@ -651,34 +629,44 @@ const Reports = ({ transactions }) => {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                <th className="px-4 py-2">Report</th>
-                <th className="px-4 py-2">Period</th>
-                <th className="px-4 py-2">Taxable Income</th>
-                <th className="px-4 py-2">Deductible Expenses</th>
-                <th className="px-4 py-2">Estimated Tax</th>
-                <th className="px-4 py-2">Due Date</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {taxReports.map((report) => (
-                <tr key={report.id}>
-                  <td className="px-4 py-3 text-sm text-gray-300">{report.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-300">{report.period}</td>
-                  <td className="px-4 py-3 text-sm text-green-400">{formatCurrency(report.data.taxableIncome)}</td>
-                  <td className="px-4 py-3 text-sm text-red-400">{formatCurrency(report.data.taxDeductibleExpenses)}</td>
-                  <td className="px-4 py-3 text-sm text-yellow-400">{formatCurrency(report.data.estimatedTax)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-300">{formatDate(report.dueDate)}</td>
+              <thead>
+                <tr className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  <th className="px-4 py-2">Report</th>
+                  <th className="px-4 py-2">Period</th>
+                  <th className="px-4 py-2">Tax Liability</th>
+                  <th className="px-4 py-2">Tax Paid</th>
+                  <th className="px-4 py-2">Tax Due </th>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              {loading ? (
+                <tbody>
+                  <tr><td colSpan={7}>
+                    <div className="flex flex-col items-center justify-center h-32">
+                      <Loader2 className="animate-spin text-white h-6 w-6 mb-2" />
+                      <span className="text-white text-sm">Analyzing with Gemini AI...</span>
+                    </div>
+                  </td></tr>
+                </tbody>
+              ) : (
+              <tbody className="divide-y divide-gray-800">
+              {quarterlyTaxSummary && quarterlyTaxSummary.quarter && (
+                <tr>
+                  <td className="px-4 py-3 text-sm text-gray-300">Quarterly Tax Summary</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">{quarterlyTaxSummary.quarter}</td>
+                  <td className="px-4 py-3 text-sm text-green-400">
+                    {formatCurrency(quarterlyTaxSummary.tax_liability)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-red-400">
+                    {formatCurrency(quarterlyTaxSummary.tax_paid)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    {formatCurrency(quarterlyTaxSummary.tax_due)}
+                  </td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      report.status === 'ready' 
-                        ? 'bg-green-900/30 text-green-400'
-                        : 'bg-yellow-900/30 text-yellow-400'
-                    }`}>
-                      {report.status}
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                      Finalized
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
@@ -695,8 +683,76 @@ const Reports = ({ transactions }) => {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              )}
+              
+              {annualTaxReport && annualTaxReport.fiscal_year && (
+                <tr>
+                  <td className="px-4 py-3 text-sm text-gray-300">Annual Tax Report</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">{annualTaxReport.fiscal_year}</td>
+                  <td className="px-4 py-3 text-sm text-green-400">
+                    {formatCurrency(annualTaxReport.total_tax_liability)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-red-400">
+                    {formatCurrency(annualTaxReport.total_tax_paid)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    {formatCurrency(annualTaxReport.carryforward_amount)}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                      Finalized
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    <div className="flex justify-end space-x-2">
+                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                        <Download size={16} />
+                      </button>
+                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                        <Printer size={16} />
+                      </button>
+                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                        <Share2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              
+              {salesTaxReport && (
+                <tr>
+                  <td className="px-4 py-3 text-sm text-gray-300">Sales Tax Report</td>
+                  <td className="px-4 py-3 text-sm text-gray-300">N/A</td>
+                  <td className="px-4 py-3 text-sm text-green-400">
+                    {formatCurrency(salesTaxReport.sales_revenue)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-red-400">
+                    {formatCurrency(salesTaxReport.sales_tax_collected)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-white">
+                    {formatCurrency(salesTaxReport.sales_tax_due)}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                      Finalized
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    <div className="flex justify-end space-x-2">
+                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                        <Download size={16} />
+                      </button>
+                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                        <Printer size={16} />
+                      </button>
+                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                        <Share2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </tbody> )}
           </table>
         </div>
       </div>
