@@ -2,19 +2,58 @@ import React, { useState, useEffect } from 'react';
 import { PieChart, BarChart3, TrendingUp, ArrowUpRight, ArrowDownRight, AlertCircle } from 'lucide-react';
 
 const FinancialPlanning = ({ transactions }) => {
-  const [financialGoals, setFinancialGoals] = useState([]);
-  const [cashFlow, setCashFlow] = useState({});
+  const [financialGoals, setFinancialGoals] = useState([
+    {
+      name: 'Emergency Fund',
+      current: 0,
+      target: 6,
+      unit: 'months',
+      progress: 0,
+      status: 'in-progress'
+    },
+    {
+      name: 'Savings Rate',
+      current: 0,
+      target: 20,
+      unit: '%',
+      progress: 0,
+      status: 'in-progress'
+    },
+    {
+      name: 'Debt Reduction',
+      current: 0,
+      target: 0,
+      unit: 'currency',
+      progress: 0,
+      status: 'in-progress'
+    }
+  ]);
+  const [cashFlow, setCashFlow] = useState({
+    income: 0,
+    expenses: 0,
+    savings: 0,
+    savingsRate: 0
+  });
   const [netWorth, setNetWorth] = useState(0);
-  const [emergencyFund, setEmergencyFund] = useState({});
+  const [emergencyFund, setEmergencyFund] = useState({
+    monthsCovered: 0,
+    recommended: 6,
+    status: 'low'
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (transactions && transactions.length > 0) {
+    if (transactions) {
       try {
         setIsLoading(true);
         setError(null);
-        analyzeFinancialPlan(transactions);
+        
+        if (transactions.length > 0) {
+          analyzeFinancialPlan(transactions);
+        } else {
+          setEmptyState();
+        }
       } catch (err) {
         setError('Failed to analyze financial plan: ' + err.message);
       } finally {
@@ -23,8 +62,48 @@ const FinancialPlanning = ({ transactions }) => {
     }
   }, [transactions]);
 
+  const setEmptyState = () => {
+    setFinancialGoals([
+      {
+        name: 'Emergency Fund',
+        current: 0,
+        target: 6,
+        unit: 'months',
+        progress: 0,
+        status: 'in-progress'
+      },
+      {
+        name: 'Savings Rate',
+        current: 0,
+        target: 20,
+        unit: '%',
+        progress: 0,
+        status: 'in-progress'
+      },
+      {
+        name: 'Debt Reduction',
+        current: 0,
+        target: 0,
+        unit: 'currency',
+        progress: 0,
+        status: 'in-progress'
+      }
+    ]);
+    setCashFlow({
+      income: 0,
+      expenses: 0,
+      savings: 0,
+      savingsRate: 0
+    });
+    setNetWorth(0);
+    setEmergencyFund({
+      monthsCovered: 0,
+      recommended: 6,
+      status: 'low'
+    });
+  };
+
   const analyzeFinancialPlan = (transactions) => {
-    // Calculate total income and expenses
     const totalIncome = transactions
       .filter(t => t.transactionType === 'income')
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
@@ -33,7 +112,6 @@ const FinancialPlanning = ({ transactions }) => {
       .filter(t => t.transactionType === 'expense')
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // Calculate assets and liabilities
     const totalAssets = transactions
       .filter(t => t.category === 'asset')
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
@@ -42,22 +120,19 @@ const FinancialPlanning = ({ transactions }) => {
       .filter(t => t.category === 'liability' || t.category === 'debt')
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // Calculate net worth
     const calculatedNetWorth = totalAssets - totalLiabilities;
     setNetWorth(calculatedNetWorth);
 
-    // Calculate emergency fund coverage
     const monthlyExpenses = totalExpenses / 12;
     const emergencyFundMonths = totalAssets > 0 ? 
       Math.floor((totalAssets / monthlyExpenses) * 100) / 100 : 0;
 
     setEmergencyFund({
       monthsCovered: emergencyFundMonths,
-      recommended: 6, // Typically 3-6 months of expenses
+      recommended: 6,
       status: emergencyFundMonths >= 6 ? 'healthy' : emergencyFundMonths >= 3 ? 'moderate' : 'low'
     });
 
-    // Set cash flow analysis
     setCashFlow({
       income: totalIncome,
       expenses: totalExpenses,
@@ -65,7 +140,6 @@ const FinancialPlanning = ({ transactions }) => {
       savingsRate: totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0
     });
 
-    // Set financial goals (example goals)
     setFinancialGoals([
       {
         name: 'Emergency Fund',
@@ -77,16 +151,16 @@ const FinancialPlanning = ({ transactions }) => {
       },
       {
         name: 'Savings Rate',
-        current: cashFlow.savingsRate,
+        current: parseFloat(((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1)) || 0,
         target: 20,
         unit: '%',
-        progress: Math.min((cashFlow.savingsRate / 20) * 100, 100),
-        status: cashFlow.savingsRate >= 20 ? 'achieved' : 'in-progress'
+        progress: Math.min((((totalIncome - totalExpenses) / totalIncome * 100) / 20) * 100, 100),
+        status: ((totalIncome - totalExpenses) / totalIncome * 100) >= 20 ? 'achieved' : 'in-progress'
       },
       {
         name: 'Debt Reduction',
         current: totalLiabilities,
-        target: totalLiabilities * 0.5, // Aim to reduce by 50%
+        target: totalLiabilities * 0.5,
         unit: 'currency',
         progress: totalLiabilities > 0 ? 
           Math.max(0, 100 - (totalLiabilities / (totalLiabilities * 0.5) * 100)) : 
@@ -101,7 +175,7 @@ const FinancialPlanning = ({ transactions }) => {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   if (isLoading) {
@@ -109,14 +183,6 @@ const FinancialPlanning = ({ transactions }) => {
       <div className="flex items-center justify-center h-64 flex-col">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
         <p className="text-gray-400">Loading financial plan...</p>
-      </div>
-    );
-  }
-
-  if (!transactions || transactions.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p>No data available for financial planning</p>
       </div>
     );
   }
@@ -141,7 +207,6 @@ const FinancialPlanning = ({ transactions }) => {
         </div>
       </div>
 
-      {/* Net Worth */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
         <h2 className="mb-6 text-xl font-bold text-white">Net Worth</h2>
         <div className="text-center">
@@ -150,7 +215,6 @@ const FinancialPlanning = ({ transactions }) => {
         </div>
       </div>
 
-      {/* Cash Flow */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
         <h2 className="mb-6 text-xl font-bold text-white">Cash Flow Analysis</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -169,7 +233,6 @@ const FinancialPlanning = ({ transactions }) => {
         </div>
       </div>
 
-      {/* Emergency Fund */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
         <h2 className="mb-6 text-xl font-bold text-white">Emergency Fund</h2>
         <div className="flex items-center justify-between">
@@ -194,7 +257,6 @@ const FinancialPlanning = ({ transactions }) => {
         </div>
       </div>
 
-      {/* Financial Goals */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
         <h2 className="mb-6 text-xl font-bold text-white">Financial Goals</h2>
         <div className="space-y-4">
