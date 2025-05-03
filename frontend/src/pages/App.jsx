@@ -49,7 +49,6 @@ function App({ actor, isAuthenticated, login }) {
   const [analyzingFile, setAnalyzingFile] = useState("");
   const [activeMainCategory, setActiveMainCategory] = useState("accountant");
   const [activeSubTab, setActiveSubTab] = useState("data-input");
-  const [processingMode, setProcessingMode] = useState("auto"); // "auto" or "manual"
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   // Processing log state
@@ -667,9 +666,9 @@ Document: ${truncatedContent}`;
               `Extracted ${transactions.length} transactions from ${fileName}`
             );
 
-            // Add the extracted transactions to our state if in auto mode
-            // or if this file was explicitly selected for processing
-            if (processingMode === "auto" || analyzingFile === fileName) {
+            // Add the extracted transactions to our state
+            // Always process if this file was explicitly selected for processing
+            if (analyzingFile === fileName) {
               // Add file reference and timestamp to each transaction
               const timestampedTransactions = transactions.map(
                 (transaction) => ({
@@ -752,11 +751,9 @@ Document: ${truncatedContent}`;
               title: "Document Processed",
               html: `
                 <div class="text-left">
-                  <p>${
-                    processingMode === "auto" || analyzingFile === fileName
-                      ? `Successfully extracted and added ${transactions.length} transactions from ${fileName} to log trails`
-                      : `Successfully extracted ${transactions.length} transactions from ${fileName}. Switch to manual processing mode to add them to log trails.`
-                  }</p>
+                  <p>Successfully extracted and added ${
+                    transactions.length
+                  } transactions from ${fileName} to log trails</p>
                   <div class="mt-4">
                     <h3 class="text-lg font-bold mb-2">Extracted Transactions:</h3>
                     <div class="bg-gray-100 p-3 rounded max-h-60 overflow-auto text-sm">
@@ -1317,6 +1314,221 @@ File name: ${fileName}`,
     }
   }
 
+  // Function to process all documents
+  async function handleProcessAllFiles() {
+    try {
+      // Check if there are any files to process
+      if (files.length === 0) {
+        import("../utils/toastNotification").then(({ showToast }) => {
+          showToast("No documents to process", "info");
+        });
+        return;
+      }
+
+      // Show confirmation dialog
+      Swal.fire({
+        title: "Process All Documents?",
+        text: `This will process all ${files.length} documents. Continue?`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Yes, process all!",
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          // Show processing log
+          setShowProcessingLog(true);
+          clearProcessingLogs();
+          addProcessingLog(
+            `Starting to process all ${files.length} files`,
+            "info"
+          );
+
+          // IMMEDIATELY show a loading dialog that can't be dismissed
+          Swal.fire({
+            title: "Processing Documents...",
+            html: `
+              <div class="text-center">
+                <div class="mb-3">Processing ${files.length} documents</div>
+                <div class="progress-bar-container" style="height: 10px; background-color: #333; border-radius: 5px; overflow: hidden;">
+                  <div id="process-progress-bar" style="height: 100%; width: 0%; background-color: #3b82f6; transition: width 0.3s;"></div>
+                </div>
+                <div id="process-progress-text" class="mt-2">Starting processing...</div>
+              </div>
+            `,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              const progressBar = document.getElementById(
+                "process-progress-bar"
+              );
+              const progressText = document.getElementById(
+                "process-progress-text"
+              );
+
+              // Start with animation to show it's working
+              progressBar.style.width = "5%";
+              progressText.textContent = "Preparing to process...";
+            },
+          });
+
+          // Wait a moment to show the dialog
+          await new Promise((resolve) => setTimeout(resolve, 300));
+
+          const progressBar = document.getElementById("process-progress-bar");
+          const progressText = document.getElementById("process-progress-text");
+
+          // Get list of unprocessed files
+          const processedFiles = JSON.parse(
+            localStorage.getItem("processedFiles") || "[]"
+          );
+
+          const unprocessedFiles = files.filter(
+            (file) => !processedFiles.includes(file.name)
+          );
+          const totalFiles = unprocessedFiles.length;
+
+          if (totalFiles === 0) {
+            progressBar.style.width = "100%";
+            progressText.textContent =
+              "All documents have already been processed!";
+
+            // Close the loading dialog after a short delay
+            setTimeout(() => {
+              Swal.close();
+
+              // Show info notification
+              import("../utils/toastNotification").then(({ showToast }) => {
+                showToast(`All documents have already been processed`, "info");
+              });
+            }, 1500);
+            return;
+          }
+
+          // Process files one by one
+          let processedCount = 0;
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const file of unprocessedFiles) {
+            processedCount++;
+
+            // Update progress
+            const progress = 5 + Math.round((processedCount / totalFiles) * 95); // Start at 5% and go to 100%
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `Processing document ${processedCount}/${totalFiles}: ${file.name}`;
+
+            try {
+              addProcessingLog(`Processing file: ${file.name}`, "info");
+
+              // Get the file data
+              const fileData = await handleFileDownload(file.name, true);
+
+              if (fileData) {
+                // Determine file type
+                const fileType = file.name.split(".").pop().toLowerCase();
+                const isTextBased = ["txt", "csv", "json"].includes(fileType);
+                const isSpreadsheet = ["xlsx", "xls", "ods"].includes(fileType);
+                const isDocument = ["doc", "docx", "odt"].includes(fileType);
+                const isPDF = fileType === "pdf";
+                const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(
+                  fileType
+                );
+
+                if (isTextBased) {
+                  // Process text-based files
+                  const reader = new FileReader();
+                  reader.onload = async (e) => {
+                    const fileContent = e.target.result;
+                    const contentWithContext = `This is a text file.\n\nFile name: ${file.name}\n\nContent:\n${fileContent}`;
+                    await processDocumentWithAI(contentWithContext, file.name);
+                  };
+                  reader.readAsText(fileData);
+                } else {
+                  // Process binary files
+                  const reader = new FileReader();
+                  reader.onload = async (e) => {
+                    const base64Content = e.target.result.split(",")[1];
+
+                    // Determine file type for context
+                    let fileTypeContext = "";
+                    if (isSpreadsheet) fileTypeContext = "spreadsheet";
+                    if (isDocument) fileTypeContext = "document";
+                    if (isPDF) fileTypeContext = "PDF";
+                    if (isImage) fileTypeContext = "image";
+
+                    // Process with Gemini in silent mode
+                    await processDocumentWithBinaryData(
+                      base64Content,
+                      file.name,
+                      fileTypeContext,
+                      `application/${fileType}`,
+                      true // Silent mode
+                    );
+                  };
+                  reader.readAsDataURL(fileData);
+                }
+
+                successCount++;
+              } else {
+                errorCount++;
+                addProcessingLog(
+                  `Failed to download file: ${file.name}`,
+                  "error"
+                );
+              }
+            } catch (error) {
+              errorCount++;
+              addProcessingLog(
+                `Error processing file ${file.name}: ${error.message}`,
+                "error"
+              );
+            }
+
+            // Small delay to keep UI responsive
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+
+          // Final update
+          progressBar.style.width = "100%";
+          progressText.textContent = `Processed ${successCount} documents successfully! (${errorCount} errors)`;
+
+          // Close the loading dialog after a short delay
+          setTimeout(() => {
+            Swal.close();
+
+            // Show success notification
+            import("../utils/toastNotification").then(({ showToast }) => {
+              showToast(
+                `Processed ${successCount} documents (${errorCount} errors)`,
+                successCount > 0 ? "success" : "warning"
+              );
+            });
+          }, 1500);
+
+          // Add to processing log
+          addProcessingLog(
+            `Completed processing ${successCount} documents with ${errorCount} errors`,
+            errorCount > 0 ? "warning" : "success"
+          );
+        }
+      });
+    } catch (error) {
+      console.error("Batch processing failed:", error);
+
+      // Show error notification
+      import("../utils/toastNotification").then(({ showToast }) => {
+        showToast(`Batch processing failed: ${error.message}`, "error");
+      });
+
+      // Add to processing log
+      addProcessingLog(`Batch processing failed: ${error.message}`, "error");
+
+      // Close any open dialogs
+      Swal.close();
+    }
+  }
+
   async function handleFileProcessing(name) {
     try {
       // Show processing log
@@ -1476,34 +1688,9 @@ File name: ${fileName}`,
             );
             const contentWithContext = `This is a text file.\n\nFile name: ${name}\n\nContent:\n${fileContent}`;
 
-            // In manual mode, we only process when explicitly requested
-            // In auto mode, we process immediately
-            if (processingMode === "auto" || isManualEntry) {
-              addProcessingLog(
-                `Processing mode: ${
-                  processingMode === "auto" ? "automatic" : "manual"
-                }`,
-                "info"
-              );
-              addProcessingLog(
-                `Sending to Gemini AI for processing...`,
-                "info"
-              );
-              await processDocumentWithAI(contentWithContext, name);
-            } else {
-              // For manual mode, just show a success message
-              addProcessingLog(
-                `File loaded but not processed (manual mode)`,
-                "info"
-              );
-              Swal.close();
-              Swal.fire({
-                icon: "success",
-                title: "File Loaded",
-                text: `${name} is ready for processing. Click "Process File" again when you want to extract transactions.`,
-                showConfirmButton: true,
-              });
-            }
+            // Always process the document
+            addProcessingLog(`Sending to Gemini AI for processing...`, "info");
+            await processDocumentWithAI(contentWithContext, name);
           };
           reader.readAsText(data);
         }
@@ -1527,41 +1714,16 @@ File name: ${fileName}`,
 
             addProcessingLog(`File context type: ${fileTypeContext}`, "info");
 
-            // In manual mode, we only process when explicitly requested
-            // In auto mode, we process immediately
-            if (processingMode === "auto" || isManualEntry) {
-              addProcessingLog(
-                `Processing mode: ${
-                  processingMode === "auto" ? "automatic" : "manual"
-                }`,
-                "info"
-              );
-              addProcessingLog(
-                `Sending to Gemini AI for processing...`,
-                "info"
-              );
+            // Always process the document
+            addProcessingLog(`Sending to Gemini AI for processing...`, "info");
 
-              // Send the binary data to Gemini for processing
-              await processDocumentWithBinaryData(
-                base64Content,
-                name,
-                fileTypeContext,
-                fileType
-              );
-            } else {
-              // For manual mode, just show a success message
-              addProcessingLog(
-                `File loaded but not processed (manual mode)`,
-                "info"
-              );
-              Swal.close();
-              Swal.fire({
-                icon: "success",
-                title: "File Loaded",
-                text: `${name} is ready for processing. Click "Process File" again when you want to extract transactions.`,
-                showConfirmButton: true,
-              });
-            }
+            // Send the binary data to Gemini for processing
+            await processDocumentWithBinaryData(
+              base64Content,
+              name,
+              fileTypeContext,
+              fileType
+            );
           };
           reader.readAsDataURL(data);
         }
@@ -2779,13 +2941,12 @@ File name: ${fileName}`,
                       handleFileDownload={handleFileDownload}
                       handleFileProcessing={handleFileProcessing}
                       handleFileDelete={handleFileDelete}
+                      handleProcessAllFiles={handleProcessAllFiles}
                       getFileIcon={getFileIcon}
                       analyzingFile={analyzingFile}
                       errorMessage={errorMessage}
                       fileTransferProgress={fileTransferProgress}
                       onSaveManualData={handleSaveManualData}
-                      processingMode={processingMode}
-                      onProcessingModeChange={setProcessingMode}
                     />
                   )}
 
