@@ -4,6 +4,7 @@ import { Lightbulb, TrendingUp, DollarSign, AlertCircle, ChevronRight, Loader } 
 const Recommendations = ({ transactions }) => {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] = useState(null);
 
   useEffect(() => {
     if (transactions && transactions.length > 0) {
@@ -21,7 +22,7 @@ const Recommendations = ({ transactions }) => {
   const recommendationsFromAI = async (transactions) => {
     const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"
     const prompt = `
-        You are a financial analysis assistant. You will receive a JSON array called “transactions” where each transaction has:
+        You are a financial analysis assistant. You will receive a JSON array called "transactions" where each transaction has:
     - transactionType: "income" or "expense"
     - amount: number
     - date: ISO date string
@@ -34,11 +35,11 @@ const Recommendations = ({ transactions }) => {
     3. Calculate the percentage of expenses that are tax-deductible.
     4. Detect any transactions that significantly deviate (e.g., >2×) from the average transaction amount.
     5. Identify recurring patterns or seasonality in cash flow.
-    6. Suggest additional “Revenue Generation” opportunities.
-    7. Recommend “Expense Reduction” strategies.
-    8. Propose “Cash Flow Optimization” tactics (e.g., invoicing terms, reserves).
-    9. Point out “Tax Optimization” moves.
-    10. Highlight any “Risk Management” or “Debt Management” considerations.
+    6. Suggest additional "Revenue Generation" opportunities.
+    7. Recommend "Expense Reduction" strategies.
+    8. Propose "Cash Flow Optimization" tactics (e.g., invoicing terms, reserves).
+    9. Point out "Tax Optimization" moves.
+    10. Highlight any "Risk Management" or "Debt Management" considerations.
 
     Return only a JSON array of recommendation objects, each with these fields:
     - id: unique integer  
@@ -192,11 +193,31 @@ const Recommendations = ({ transactions }) => {
                 </div>
               </div>
               <div className="mt-3 ml-12">
-                <button className="flex items-center text-sm text-blue-400 hover:text-blue-300 transition-colors">
+                <button
+                  className="flex items-center text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  onClick={() => setSelectedRecommendation(recommendation)}
+                >
                   <span>View details</span>
                   <ChevronRight size={16} className="ml-1" />
                 </button>
               </div>
+              {selectedRecommendation?.id === recommendation.id && (
+                <div className="mt-4 p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                  <h4 className="text-white font-bold mb-2">{selectedRecommendation.title}</h4>
+                  <p className="text-gray-300">{selectedRecommendation.description}</p>
+                  <p className="text-sm text-blue-300 mt-2">
+                    <strong>Impact:</strong> {selectedRecommendation.impact} <br />
+                    <strong>Category:</strong> {selectedRecommendation.category} <br />
+                    <strong>Savings:</strong> {selectedRecommendation.savings}
+                  </p>
+                  <button
+                    className="mt-2 text-xs text-red-400 hover:underline"
+                    onClick={() => setSelectedRecommendation(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

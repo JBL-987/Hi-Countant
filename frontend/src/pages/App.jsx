@@ -33,6 +33,11 @@ import LogTrails from "../components/accountant/LogTrails";
 import TransactionDetails from "../components/accountant/TransactionDetails";
 import ProcessingLog from "../components/accountant/ProcessingLog";
 
+// Import Advisor components
+import FinancialPlanning from "../components/advisor/FinancialPlanning";
+import Investment from "../components/advisor/Investment";
+import TaxStrategy from "../components/advisor/TaxStrategy";
+
 function App({ actor, isAuthenticated, login }) {
   const navigate = useNavigate();
   const [files, setFiles] = useState([]);
@@ -2043,143 +2048,25 @@ File name: ${fileName}`,
               {activeMainCategory === "advisor" && (
                 <>
                   {activeSubTab === "financial-planning" && (
-                    <FinancialPlanning />
+                    <FinancialPlanning analysisResult={analysisResult?.financialPlan} isLoading={isLoading} />
                   )}
-
-                  {activeSubTab === "investment" && <Investment />}
-
-                  {activeSubTab === "tax-strategy" && <TaxStrategy />}
+                  {activeSubTab === "investment" && (
+                    <Investment analysisResult={analysisResult?.investment} isLoading={isLoading} />
+                  )}
+                  {activeSubTab === "tax-strategy" && (
+                    <TaxStrategy analysisResult={analysisResult?.taxStrategy} isLoading={isLoading} />
+                  )}
+                  {["financial-planning", "investment", "tax-strategy"].indexOf(activeSubTab) === -1 && (
+                    <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
+                      <div className="text-center">
+                        <Users className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+                        <h3 className="text-xl font-medium text-white mb-2">
+                          Agentic Advisor
+                        </h3>
+                      </div>
+                    </div>
+                  )}
                 </>
-              )}
-
-              {/* Advisor placeholder */}
-              {activeMainCategory === "advisor" && (
-                <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
-                  <div className="text-center">
-                    <Users className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-medium text-white mb-2">
-                      Agentic Advisor
-                    </h3>
-                    <p className="text-gray-400 max-w-md">
-                      This feature is coming soon. The Agentic Advisor will
-                      provide personalized financial advice and planning.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Analysis Result Modal */}
-              {analysisResult && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                  <div className="bg-gray-900 border border-blue-900/30 rounded-xl p-6 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                    <div className="flex justify-between items-center mb-4">
-                      <div>
-                        <h2 className="text-xl font-bold text-white">
-                          {analysisResult.fileName} Analysis
-                        </h2>
-                        <p className="text-sm text-blue-400 mt-1">
-                          Powered by Gemini AI
-                        </p>
-                      </div>
-                      <button
-                        onClick={closeAnalysis}
-                        className="p-1 rounded-full hover:bg-gray-800"
-                      >
-                        <ChevronRight size={18} className="text-gray-400" />
-                      </button>
-                    </div>
-                    <div className="border-t border-gray-800 my-2 pt-4"></div>
-                    <div className="prose prose-invert max-w-none flex-1 overflow-auto">
-                      <div className="bg-gray-800 p-4 rounded-lg text-gray-300">
-                        {/* Format the content with Markdown-like rendering */}
-                        {analysisResult.content
-                          .split("\n")
-                          .map((line, index) => {
-                            // Format headings
-                            if (line.startsWith("# ")) {
-                              return (
-                                <h1
-                                  key={index}
-                                  className="text-xl font-bold text-white mt-4 mb-2"
-                                >
-                                  {line.substring(2)}
-                                </h1>
-                              );
-                            } else if (line.startsWith("## ")) {
-                              return (
-                                <h2
-                                  key={index}
-                                  className="text-lg font-bold text-white mt-3 mb-2"
-                                >
-                                  {line.substring(3)}
-                                </h2>
-                              );
-                            } else if (line.startsWith("### ")) {
-                              return (
-                                <h3
-                                  key={index}
-                                  className="text-md font-bold text-white mt-2 mb-1"
-                                >
-                                  {line.substring(4)}
-                                </h3>
-                              );
-                            }
-                            // Format lists
-                            else if (line.match(/^\d+\.\s/)) {
-                              return (
-                                <div key={index} className="ml-4 my-1">
-                                  {line}
-                                </div>
-                              );
-                            } else if (line.match(/^-\s/)) {
-                              return (
-                                <div key={index} className="ml-4 my-1">
-                                  {line}
-                                </div>
-                              );
-                            } else if (line.match(/^\*\s/)) {
-                              return (
-                                <div key={index} className="ml-4 my-1">
-                                  {line}
-                                </div>
-                              );
-                            }
-                            // Format empty lines
-                            else if (line.trim() === "") {
-                              return <div key={index} className="h-2"></div>;
-                            }
-                            // Default paragraph
-                            else {
-                              return (
-                                <div key={index} className="my-1">
-                                  {line}
-                                </div>
-                              );
-                            }
-                          })}
-                      </div>
-                    </div>
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={() => {
-                          // Create a blob and download the analysis as a text file
-                          const blob = new Blob([analysisResult.content], {
-                            type: "text/plain",
-                          });
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement("a");
-                          link.href = url;
-                          link.download = `${analysisResult.fileName}-analysis.txt`;
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        }}
-                        className="px-3 py-2 text-sm font-medium rounded-md bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 transition-colors"
-                      >
-                        Download Analysis
-                      </button>
-                    </div>
-                  </div>
-                </div>
               )}
             </div>
           </div>
