@@ -172,24 +172,82 @@ function App({ actor, isAuthenticated, login }) {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          console.log("Deleting all transactions from localStorage");
-
           // Get the count for the notification
           const count = transactions.length;
 
+          // IMMEDIATELY show a loading dialog that can't be dismissed
+          Swal.fire({
+            title: "Deleting Transactions...",
+            html: `
+              <div class="text-center">
+                <div class="mb-3">Deleting ${count} transactions</div>
+                <div class="progress-bar-container" style="height: 10px; background-color: #333; border-radius: 5px; overflow: hidden;">
+                  <div id="delete-progress-bar" style="height: 100%; width: 0%; background-color: #dc3545; transition: width 0.3s;"></div>
+                </div>
+                <div id="delete-progress-text" class="mt-2">Starting deletion...</div>
+              </div>
+            `,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+              const progressBar = document.getElementById(
+                "delete-progress-bar"
+              );
+              const progressText = document.getElementById(
+                "delete-progress-text"
+              );
+
+              // Start with animation to show it's working
+              progressBar.style.width = "5%";
+              progressText.textContent = "Preparing to delete...";
+            },
+          });
+
+          // Wait a moment to show the dialog
+          await new Promise((resolve) => setTimeout(resolve, 300));
+
+          // Process in batches to update the UI
+          const batchSize = 100;
+          const batches = Math.ceil(count / batchSize);
+          const progressBar = document.getElementById("delete-progress-bar");
+          const progressText = document.getElementById("delete-progress-text");
+
+          // Process in batches
+          for (let i = 0; i < batches; i++) {
+            // Update progress
+            const progress = Math.round(((i + 1) / batches) * 100);
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `Deleting transactions (${Math.min(
+              (i + 1) * batchSize,
+              count
+            )}/${count})`;
+
+            // Simulate batch processing with a small delay to update UI
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+
           // Clear transactions from localStorage
           localStorage.setItem("transactions", JSON.stringify([]));
-          console.log(
-            "Successfully deleted all transactions from localStorage"
-          );
 
           // Clear transactions from state
           setTransactions([]);
 
-          // Show non-intrusive toast notification
-          import("../utils/toastNotification").then(({ showToast }) => {
-            showToast(`Successfully deleted ${count} transactions`, "success");
-          });
+          // Final update
+          progressBar.style.width = "100%";
+          progressText.textContent = `Deleted ${count} transactions successfully!`;
+
+          // Close the loading dialog after a short delay
+          setTimeout(() => {
+            Swal.close();
+
+            // Show success notification
+            import("../utils/toastNotification").then(({ showToast }) => {
+              showToast(
+                `Successfully deleted ${count} transactions`,
+                "success"
+              );
+            });
+          }, 1000);
 
           // Add to processing log
           addProcessingLog(
@@ -1646,17 +1704,76 @@ File name: ${fileName}`,
             // Get the count for the notification
             const count = files.length;
 
-            // Delete all files one by one
-            for (const file of files) {
+            // IMMEDIATELY show a loading dialog that can't be dismissed
+            Swal.fire({
+              title: "Deleting Documents...",
+              html: `
+                <div class="text-center">
+                  <div class="mb-3">Deleting ${count} documents</div>
+                  <div class="progress-bar-container" style="height: 10px; background-color: #333; border-radius: 5px; overflow: hidden;">
+                    <div id="delete-progress-bar" style="height: 100%; width: 0%; background-color: #dc3545; transition: width 0.3s;"></div>
+                  </div>
+                  <div id="delete-progress-text" class="mt-2">Starting deletion...</div>
+                </div>
+              `,
+              allowOutsideClick: false,
+              showConfirmButton: false,
+              didOpen: () => {
+                const progressBar = document.getElementById(
+                  "delete-progress-bar"
+                );
+                const progressText = document.getElementById(
+                  "delete-progress-text"
+                );
+
+                // Start with animation to show it's working
+                progressBar.style.width = "5%";
+                progressText.textContent = "Preparing to delete...";
+              },
+            });
+
+            // Wait a moment to show the dialog
+            await new Promise((resolve) => setTimeout(resolve, 300));
+
+            const progressBar = document.getElementById("delete-progress-bar");
+            const progressText = document.getElementById(
+              "delete-progress-text"
+            );
+
+            // Delete files one by one with progress updates
+            for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+
+              // Update progress
+              const progress = 5 + Math.round(((i + 1) / count) * 95); // Start at 5% and go to 100%
+              progressBar.style.width = `${progress}%`;
+              progressText.textContent = `Deleting document ${
+                i + 1
+              }/${count}: ${file.name}`;
+
+              // Delete the file
               await actor.deleteFile(file.name);
+
+              // Small delay to keep UI responsive
+              await new Promise((resolve) => setTimeout(resolve, 100));
             }
 
+            // Final update
+            progressBar.style.width = "100%";
+            progressText.textContent = `Deleted ${count} documents successfully!`;
+
+            // Refresh the file list
             await loadFiles();
 
-            // Show non-intrusive toast notification
-            import("../utils/toastNotification").then(({ showToast }) => {
-              showToast(`Successfully deleted ${count} documents`, "success");
-            });
+            // Close the loading dialog after a short delay
+            setTimeout(() => {
+              Swal.close();
+
+              // Show success notification
+              import("../utils/toastNotification").then(({ showToast }) => {
+                showToast(`Successfully deleted ${count} documents`, "success");
+              });
+            }, 1000);
 
             // Add to processing log
             addProcessingLog(`Deleted ${count} documents`, "info");
