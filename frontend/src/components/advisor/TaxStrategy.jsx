@@ -8,19 +8,11 @@ const LoadingState = ({ message }) => (
   </div>
 );
 
-const TaxStrategy = ({ analysisResult, isLoading }) => {
-  const taxData = analysisResult; 
+const TaxStrategy = ({ transaction, isLoading }) => {
+  const taxData = transaction; 
     
   if (isLoading) {
     return <LoadingState message="Loading tax strategy data..." />;
-  }
-
-  if (!taxData) {
-    return (
-      <div className="flex flex-col justify-center items-center py-10 space-y-2">
-        <div className="text-white text-sm">No tax strategy data available.</div>
-      </div>
-    );
   }
 
   return (

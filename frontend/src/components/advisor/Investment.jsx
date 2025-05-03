@@ -8,21 +8,13 @@ const LoadingState = ({ message }) => (
   </div>
 );
 
-const Investment = ({ analysisResult, isLoading }) => {
-  const investmentData = analysisResult; 
+const Investment = ({ transaction, isLoading }) => {
+  const investmentData = transaction; 
   
   if (isLoading) {
     return <LoadingState message="Loading investments data..." />;
   }
-
-  if (!investmentData) {
-    return (
-      <div className="flex flex-col justify-center items-center py-10 space-y-2">
-        <div className="text-white text-sm">No investment data available.</div>
-      </div>
-    );
-  }
-
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">

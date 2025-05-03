@@ -8,19 +8,11 @@ const LoadingState = ({ message }) => (
   </div>
 );
 
-const FinancialPlanning = ({ analysisResult, isLoading }) => {
-  const financialPlan = analysisResult; 
+const FinancialPlanning = ({ transaction, isLoading }) => {
+  const financialPlan = transaction; 
     
   if (isLoading) {
     return <LoadingState message="Loading financial planning data..." />;
-  }
-
-  if (!financialPlan) {
-    return (
-      <div className="flex flex-col justify-center items-center py-10 space-y-2">
-        <div className="text-white text-sm">No financial planning data available.</div>
-      </div>
-    );
   }
 
   return (

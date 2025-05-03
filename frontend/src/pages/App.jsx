@@ -2048,13 +2048,13 @@ File name: ${fileName}`,
               {activeMainCategory === "advisor" && (
                 <>
                   {activeSubTab === "financial-planning" && (
-                    <FinancialPlanning analysisResult={analysisResult?.financialPlan} isLoading={isLoading} />
+                    <FinancialPlanning transactions={transactions} isLoading={isLoading} />
                   )}
                   {activeSubTab === "investment" && (
-                    <Investment analysisResult={analysisResult?.investment} isLoading={isLoading} />
+                    <Investment transactions={transactions} isLoading={isLoading} />
                   )}
                   {activeSubTab === "tax-strategy" && (
-                    <TaxStrategy analysisResult={analysisResult?.taxStrategy} isLoading={isLoading} />
+                    <TaxStrategy transactions={transactions} isLoading={isLoading} />
                   )}
                   {["financial-planning", "investment", "tax-strategy"].indexOf(activeSubTab) === -1 && (
                     <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">

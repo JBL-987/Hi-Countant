@@ -34,11 +34,7 @@ const Validation = ({
       messages.push('Transaction description incomplete');
       status = 'error';
     }
-    if (!transaction.sourceFile && !transaction.reference) {
-      messages.push('Source document unavailable');
-      status = 'error';
-    }
-
+    
     // 2. Monetary Value Validation
     if (!transaction.amount || isNaN(parseFloat(transaction.amount))) {
       messages.push('Invalid transaction amount');
