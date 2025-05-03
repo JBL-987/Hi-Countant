@@ -3,8 +3,45 @@ import { PieChart, BarChart3, TrendingUp, ArrowUpRight, ArrowDownRight, AlertCir
 
 const Analysis = ({ transactions }) => {
   // State untuk menyimpan hasil analisis
-  const [financialRatios, setFinancialRatios] = useState([]);
-  const [budgetComparison, setBudgetComparison] = useState([]);
+  const [financialRatios, setFinancialRatios] = useState([
+    {
+      name: 'Current Ratio',
+      value: '0',
+      change: '0',
+      status: 'neutral',
+      description: 'Measures ability to pay short-term obligations'
+    },
+    {
+      name: 'Profit Margin',
+      value: '0%',
+      change: '0%',
+      status: 'neutral',
+      description: 'Percentage of revenue that becomes profit'
+    },
+    {
+      name: 'Debt Ratio',
+      value: '0',
+      change: '0',
+      status: 'neutral',
+      description: 'Proportion of assets financed by debt'
+    },
+  ]);
+  const [budgetComparison, setBudgetComparison] = useState([
+    {
+      category: 'Revenue',
+      budget: 0,
+      actual: 0,
+      variance: 0,
+      status: 'neutral'
+    },
+    {
+      category: 'Expenses',
+      budget: 0,
+      actual: 0,
+      variance: 0,
+      status: 'neutral'
+    }
+  ]);
   const [monthlyTrends, setMonthlyTrends] = useState([]);
   const [expensesByCategory, setExpensesByCategory] = useState([]);
   const [anomalies, setAnomalies] = useState([]);
@@ -13,11 +50,17 @@ const Analysis = ({ transactions }) => {
 
   // Effect untuk menganalisis transaksi ketika data berubah
   useEffect(() => {
-    if (transactions && transactions.length > 0) {
+    if (transactions) {
       try {
         setIsLoading(true);
         setError(null);
-        analyzeTransactions(transactions);
+        
+        if (transactions.length > 0) {
+          analyzeTransactions(transactions);
+        } else {
+          // Set empty state with zeros
+          setEmptyState();
+        }
       } catch (err) {
         setError('Failed to analyze transactions: ' + err.message);
       } finally {
@@ -26,10 +69,73 @@ const Analysis = ({ transactions }) => {
     }
   }, [transactions]);
 
+  // Set empty state with zeros
+  const setEmptyState = () => {
+    setFinancialRatios([
+      {
+        name: 'Current Ratio',
+        value: '0',
+        change: '0',
+        status: 'neutral',
+        description: 'Measures ability to pay short-term obligations'
+      },
+      {
+        name: 'Profit Margin',
+        value: '0%',
+        change: '0%',
+        status: 'neutral',
+        description: 'Percentage of revenue that becomes profit'
+      },
+      {
+        name: 'Debt Ratio',
+        value: '0',
+        change: '0',
+        status: 'neutral',
+        description: 'Proportion of assets financed by debt'
+      },
+    ]);
+
+    setBudgetComparison([
+      {
+        category: 'Revenue',
+        budget: 0,
+        actual: 0,
+        variance: 0,
+        status: 'neutral'
+      },
+      {
+        category: 'Expenses',
+        budget: 0,
+        actual: 0,
+        variance: 0,
+        status: 'neutral'
+      }
+    ]);
+
+    setMonthlyTrends([
+      {
+        month: new Date().toLocaleString('default', { month: 'long' }),
+        income: 0,
+        expenses: 0,
+        profit: 0
+      }
+    ]);
+
+    setExpensesByCategory([
+      {
+        category: 'No expenses',
+        amount: 0,
+        percentage: '0'
+      }
+    ]);
+
+    setAnomalies([]);
+  };
+
   // Fungsi untuk menganalisis transaksi
   const analyzeTransactions = (transactions) => {
-    if (!Array.isArray(transactions) || transactions.length === 0) {
-      throw new Error('No transactions to analyze');
+    if (!Array.isArray(transactions)) {
+      throw new Error('Invalid transactions data');
     }
 
     // Hitung total pendapatan dan pengeluaran
@@ -202,24 +308,16 @@ const Analysis = ({ transactions }) => {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64 flex-col">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-2"></div>
-          <p className="text-gray-400">Loading analysis...</p>
+        <p className="text-gray-400">Loading analysis...</p>
       </div>
     );
-  }
-
-  if (!transactions || transactions.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p>No Data Yet to be analyzed</p>
-      </div>
-    ); 
   }
 
   if (error) {
@@ -250,8 +348,14 @@ const Analysis = ({ transactions }) => {
             <TrendingUp className="h-5 w-5 text-green-500" />
           </div>
           <p className="text-2xl font-bold text-white">{financialRatios.find(r => r.name === 'Profit Margin')?.value || '0%'}</p>
-          <p className="text-sm text-green-500 mt-2 flex items-center">
-            <ArrowUpRight className="h-4 w-4 mr-1" />
+          <p className={`text-sm mt-2 flex items-center ${
+            financialRatios.find(r => r.name === 'Profit Margin')?.status === 'positive' ? 'text-green-500' : 
+            financialRatios.find(r => r.name === 'Profit Margin')?.status === 'negative' ? 'text-red-500' : 'text-gray-500'
+          }`}>
+            {financialRatios.find(r => r.name === 'Profit Margin')?.status === 'positive' ? 
+              <ArrowUpRight className="h-4 w-4 mr-1" /> : 
+              <ArrowDownRight className="h-4 w-4 mr-1" />
+            }
             <span>{financialRatios.find(r => r.name === 'Profit Margin')?.change || '0%'} from last period</span>
           </p>
         </div>
@@ -262,8 +366,14 @@ const Analysis = ({ transactions }) => {
             <BarChart3 className="h-5 w-5 text-blue-500" />
           </div>
           <p className="text-2xl font-bold text-white">{financialRatios.find(r => r.name === 'Current Ratio')?.value || '0'}</p>
-          <p className="text-sm text-blue-500 mt-2 flex items-center">
-            <ArrowUpRight className="h-4 w-4 mr-1" />
+          <p className={`text-sm mt-2 flex items-center ${
+            financialRatios.find(r => r.name === 'Current Ratio')?.status === 'positive' ? 'text-blue-500' : 
+            financialRatios.find(r => r.name === 'Current Ratio')?.status === 'negative' ? 'text-red-500' : 'text-gray-500'
+          }`}>
+            {financialRatios.find(r => r.name === 'Current Ratio')?.status === 'positive' ? 
+              <ArrowUpRight className="h-4 w-4 mr-1" /> : 
+              <ArrowDownRight className="h-4 w-4 mr-1" />
+            }
             <span>{financialRatios.find(r => r.name === 'Current Ratio')?.change || '0'} from last period</span>
           </p>
         </div>
@@ -274,8 +384,14 @@ const Analysis = ({ transactions }) => {
             <PieChart className="h-5 w-5 text-purple-500" />
           </div>
           <p className="text-2xl font-bold text-white">{financialRatios.find(r => r.name === 'Debt Ratio')?.value || '0'}</p>
-          <p className="text-sm text-green-500 mt-2 flex items-center">
-            <ArrowDownRight className="h-4 w-4 mr-1" />
+          <p className={`text-sm mt-2 flex items-center ${
+            financialRatios.find(r => r.name === 'Debt Ratio')?.status === 'positive' ? 'text-green-500' : 
+            financialRatios.find(r => r.name === 'Debt Ratio')?.status === 'negative' ? 'text-red-500' : 'text-gray-500'
+          }`}>
+            {financialRatios.find(r => r.name === 'Debt Ratio')?.status === 'positive' ? 
+              <ArrowDownRight className="h-4 w-4 mr-1" /> : 
+              <ArrowUpRight className="h-4 w-4 mr-1" />
+            }
             <span>{financialRatios.find(r => r.name === 'Debt Ratio')?.change || '0'} from last period</span>
           </p>
         </div>
@@ -291,11 +407,14 @@ const Analysis = ({ transactions }) => {
               <div className="flex items-end justify-between">
                 <p className="text-2xl font-bold text-white">{ratio.value}</p>
                 <p className={`text-sm flex items-center ${
-                  ratio.status === 'positive' ? 'text-green-500' : 'text-red-500'
+                  ratio.status === 'positive' ? 'text-green-500' : 
+                  ratio.status === 'negative' ? 'text-red-500' : 'text-gray-500'
                 }`}>
                   {ratio.status === 'positive' ? 
                     <ArrowUpRight className="h-4 w-4 mr-1" /> : 
-                    <ArrowDownRight className="h-4 w-4 mr-1" />
+                    ratio.status === 'negative' ?
+                    <ArrowDownRight className="h-4 w-4 mr-1" /> :
+                    <span className="h-4 w-4 mr-1"></span>
                   }
                   <span>{ratio.change}</span>
                 </p>
@@ -326,7 +445,8 @@ const Analysis = ({ transactions }) => {
                   <td className="px-4 py-3 text-sm text-right text-gray-300">{formatCurrency(item.budget)}</td>
                   <td className="px-4 py-3 text-sm text-right text-gray-300">{formatCurrency(item.actual)}</td>
                   <td className={`px-4 py-3 text-sm text-right ${
-                    item.status === 'positive' ? 'text-green-500' : 'text-red-500'
+                    item.status === 'positive' ? 'text-green-500' : 
+                    item.status === 'negative' ? 'text-red-500' : 'text-gray-500'
                   }`}>
                     {item.variance > 0 ? '+' : ''}{formatCurrency(item.variance)}
                   </td>
@@ -341,33 +461,59 @@ const Analysis = ({ transactions }) => {
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
         <h2 className="mb-6 text-xl font-bold text-white">Monthly Trends</h2>
         <div className="space-y-4">
-          {monthlyTrends.map((month, index) => (
-            <div key={index} className="bg-gray-800 rounded-lg p-4">
-              <h3 className="text-gray-300 font-medium">{month.month}</h3>
+          {monthlyTrends.length > 0 ? (
+            monthlyTrends.map((month, index) => (
+              <div key={index} className="bg-gray-800 rounded-lg p-4">
+                <h3 className="text-gray-300 font-medium">{month.month}</h3>
+                <div className="grid grid-cols-3 gap-4 mt-2">
+                  <div>
+                    <p className="text-sm text-gray-400">Income</p>
+                    <p className="text-lg font-bold text-green-500">
+                      {formatCurrency(month.income)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Expenses</p>
+                    <p className="text-lg font-bold text-red-500">
+                      {formatCurrency(month.expenses)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Profit</p>
+                    <p className={`text-lg font-bold ${
+                      month.profit >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {formatCurrency(month.profit)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-gray-800 rounded-lg p-4">
+              <h3 className="text-gray-300 font-medium">{new Date().toLocaleString('default', { month: 'long' })}</h3>
               <div className="grid grid-cols-3 gap-4 mt-2">
                 <div>
                   <p className="text-sm text-gray-400">Income</p>
                   <p className="text-lg font-bold text-green-500">
-                    {formatCurrency(month.income)}
+                    {formatCurrency(0)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Expenses</p>
                   <p className="text-lg font-bold text-red-500">
-                    {formatCurrency(month.expenses)}
+                    {formatCurrency(0)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Profit</p>
-                  <p className={`text-lg font-bold ${
-                    month.profit >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {formatCurrency(month.profit)}
+                  <p className="text-lg font-bold text-gray-500">
+                    {formatCurrency(0)}
                   </p>
                 </div>
               </div>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -375,21 +521,33 @@ const Analysis = ({ transactions }) => {
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
         <h2 className="mb-6 text-xl font-bold text-white">Expense Categories</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {expensesByCategory.map((category, index) => (
-            <div key={index} className="bg-gray-800 rounded-lg p-4">
+          {expensesByCategory.length > 0 ? (
+            expensesByCategory.map((category, index) => (
+              <div key={index} className="bg-gray-800 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-gray-300">{category.category}</h3>
+                  <p className="text-sm text-gray-400">{category.percentage}%</p>
+                </div>
+                <p className="text-lg font-bold text-white mt-1">
+                  {formatCurrency(category.amount)}
+                </p>
+              </div>
+            ))
+          ) : (
+            <div className="bg-gray-800 rounded-lg p-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-gray-300">{category.category}</h3>
-                <p className="text-sm text-gray-400">{category.percentage}%</p>
+                <h3 className="text-gray-300">No expenses</h3>
+                <p className="text-sm text-gray-400">0%</p>
               </div>
               <p className="text-lg font-bold text-white mt-1">
-                {formatCurrency(category.amount)}
+                {formatCurrency(0)}
               </p>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
-      {/* Anomalies */}
+      {/* Anomalies - Only shown when there are anomalies */}
       {anomalies.length > 0 && (
         <div className="bg-red-900/20 rounded-lg p-4">
           <h3 className="text-red-400 font-medium mb-2">Detected Anomalies</h3>
