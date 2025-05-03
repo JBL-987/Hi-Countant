@@ -9,6 +9,7 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  PlayCircle,
 } from "lucide-react";
 import ManualDataInput from "./ManualDataInput";
 
@@ -24,13 +25,12 @@ const DataInput = ({
   handleFileDownload,
   handleFileProcessing,
   handleFileDelete,
+  handleProcessAllFiles,
   getFileIcon,
   analyzingFile,
   errorMessage,
   fileTransferProgress,
   onSaveManualData,
-  processingMode,
-  onProcessingModeChange,
 }) => {
   const [inputMode, setInputMode] = useState("file"); // 'file' or 'manual'
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -103,81 +103,6 @@ const DataInput = ({
           Manual Entry
         </button>
       </div>
-
-      {/* Processing Mode Toggle */}
-      {inputMode === "file" && (
-        <div className="bg-gray-900 border border-blue-900/30 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-gray-400">
-              Processing Mode
-            </h3>
-            <div className="relative inline-flex items-center cursor-pointer">
-              <span
-                className={`mr-3 text-sm ${
-                  processingMode === "manual"
-                    ? "text-white font-medium"
-                    : "text-gray-400"
-                }`}
-              >
-                Manual
-              </span>
-              <div
-                className="relative"
-                onClick={() =>
-                  onProcessingModeChange(
-                    processingMode === "auto" ? "manual" : "auto"
-                  )
-                }
-              >
-                <div className="w-11 h-6 bg-gray-800 rounded-full border border-gray-700"></div>
-                <div
-                  className={`absolute top-0.5 left-0.5 bg-gradient-to-r from-blue-600 to-purple-600 w-5 h-5 rounded-full transition-transform duration-300 ease-in-out ${
-                    processingMode === "auto" ? "translate-x-5" : ""
-                  }`}
-                ></div>
-              </div>
-              <span
-                className={`ml-3 text-sm ${
-                  processingMode === "auto"
-                    ? "text-white font-medium"
-                    : "text-gray-400"
-                }`}
-              >
-                Automatic
-              </span>
-            </div>
-          </div>
-          <div className="text-xs text-gray-500 mt-2 bg-gray-800 p-3 rounded border border-gray-700">
-            {processingMode === "auto" ? (
-              <div>
-                <p className="font-medium text-blue-400 mb-1">
-                  Automatic Mode:
-                </p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>Documents are processed immediately upon upload</li>
-                  <li>Transactions are automatically added to log trails</li>
-                  <li>Manual entries are processed right away</li>
-                </ul>
-              </div>
-            ) : (
-              <div>
-                <p className="font-medium text-blue-400 mb-1">Manual Mode:</p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>
-                    Documents are only processed when you click "Process File"
-                  </li>
-                  <li>
-                    You can review transactions before adding to log trails
-                  </li>
-                  <li>
-                    Manual entries are always processed and added to log trails
-                  </li>
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -273,6 +198,17 @@ const DataInput = ({
               <h2 className="text-xl font-bold text-white">Your Documents</h2>
               {files.length > 0 && (
                 <div className="flex items-center space-x-3">
+                  {/* Process All Button */}
+                  <button
+                    onClick={() =>
+                      handleProcessAllFiles && handleProcessAllFiles()
+                    }
+                    className="px-3 py-2 bg-green-900/30 text-green-400 rounded-md hover:bg-green-900/50 transition-colors flex items-center text-sm"
+                  >
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                    Process All
+                  </button>
+
                   {selectMode && selectedFiles.length > 0 && (
                     <button
                       onClick={() => {
