@@ -51,8 +51,6 @@ function App({ actor, isAuthenticated, login }) {
   const [activeSubTab, setActiveSubTab] = useState("data-input");
   const [processingMode, setProcessingMode] = useState("auto"); // "auto" or "manual"
   const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [manualEntries, setManualEntries] = useState([]);
 
   // Processing log state
   const [processingLogs, setProcessingLogs] = useState([]);
@@ -79,6 +77,15 @@ function App({ actor, isAuthenticated, login }) {
       confirmButtonText: "Yes, delete it!",
     }).then(async (result) => {
       if (result.isConfirmed) {
+        // Find the transaction to be deleted (for notification)
+        const transactionToDelete = transactions.find(
+          (t) => t.id === transactionId
+        );
+        const transactionDesc = transactionToDelete
+          ? transactionToDelete.description ||
+            `${transactionToDelete.transactionType} transaction`
+          : "transaction";
+
         const filteredTransactions = transactions.filter(
           (t) => t.id !== transactionId
         );
@@ -113,12 +120,31 @@ function App({ actor, isAuthenticated, login }) {
             "transactions",
             JSON.stringify(formattedTransactions)
           );
-          Swal.fire("Deleted!", "The transaction has been deleted.", "success");
+
+          // Show non-intrusive toast notification
+          import("../utils/toastNotification").then(({ showToast }) => {
+            showToast(
+              `Transaction "${transactionDesc}" deleted successfully`,
+              "success"
+            );
+          });
+
+          // Add to processing log
+          addProcessingLog(`Deleted transaction: ${transactionDesc}`, "info");
         } catch (error) {
           console.error("Failed to delete transaction:", error);
-          Swal.fire(
-            "Error",
-            "Failed to delete transaction. Please try again.",
+
+          // Show error toast
+          import("../utils/toastNotification").then(({ showToast }) => {
+            showToast(
+              `Failed to delete transaction: ${error.message}`,
+              "error"
+            );
+          });
+
+          // Add to processing log
+          addProcessingLog(
+            `Failed to delete transaction: ${error.message}`,
             "error"
           );
         }
@@ -128,11 +154,10 @@ function App({ actor, isAuthenticated, login }) {
 
   const handleDeleteAllTransactions = () => {
     if (transactions.length === 0) {
-      Swal.fire(
-        "No Transactions",
-        "There are no transactions to delete.",
-        "info"
-      );
+      // Import and use the toast notification
+      import("../utils/toastNotification").then(({ showToast }) => {
+        showToast("No transactions to delete", "info");
+      });
       return;
     }
 
@@ -148,23 +173,43 @@ function App({ actor, isAuthenticated, login }) {
       if (result.isConfirmed) {
         try {
           console.log("Deleting all transactions from localStorage");
+
+          // Get the count for the notification
+          const count = transactions.length;
+
           // Clear transactions from localStorage
           localStorage.setItem("transactions", JSON.stringify([]));
           console.log(
             "Successfully deleted all transactions from localStorage"
           );
+
           // Clear transactions from state
           setTransactions([]);
-          Swal.fire(
-            "Deleted!",
-            "All transactions have been deleted.",
-            "success"
+
+          // Show non-intrusive toast notification
+          import("../utils/toastNotification").then(({ showToast }) => {
+            showToast(`Successfully deleted ${count} transactions`, "success");
+          });
+
+          // Add to processing log
+          addProcessingLog(
+            `Deleted ${count} transactions from log trails`,
+            "info"
           );
         } catch (error) {
           console.error("Failed to delete all transactions:", error);
-          Swal.fire(
-            "Error",
-            "Failed to delete all transactions. Please try again.",
+
+          // Show error toast
+          import("../utils/toastNotification").then(({ showToast }) => {
+            showToast(
+              `Failed to delete transactions: ${error.message}`,
+              "error"
+            );
+          });
+
+          // Add to processing log
+          addProcessingLog(
+            `Failed to delete transactions: ${error.message}`,
             "error"
           );
         }
@@ -215,11 +260,6 @@ function App({ actor, isAuthenticated, login }) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const closeAnalysis = () => {
-    setAnalysisResult(null);
-    setAnalyzingFile("");
   };
 
   // Processing log functions
@@ -341,6 +381,36 @@ function App({ actor, isAuthenticated, login }) {
     }
   }, [actor, isAuthenticated, navigate]);
 
+  // Helper function to check if two transactions are duplicates
+  function areTransactionsDuplicate(t1, t2) {
+    // Check if key fields match
+    return (
+      t1.date === t2.date &&
+      Math.abs(parseFloat(t1.amount) - parseFloat(t2.amount)) < 0.01 && // Allow for small floating point differences
+      t1.description === t2.description &&
+      t1.transactionType === t2.transactionType
+    );
+  }
+
+  // Helper function to remove duplicate transactions from an array
+  function removeDuplicateTransactions(transactions) {
+    const uniqueTransactions = [];
+
+    for (const transaction of transactions) {
+      // Check if this transaction is a duplicate of any we've already added
+      const isDuplicate = uniqueTransactions.some((existingTransaction) =>
+        areTransactionsDuplicate(existingTransaction, transaction)
+      );
+
+      // If it's not a duplicate, add it to our unique list
+      if (!isDuplicate) {
+        uniqueTransactions.push(transaction);
+      }
+    }
+
+    return uniqueTransactions;
+  }
+
   // Load transactions from localStorage
   function loadTransactions() {
     try {
@@ -357,7 +427,9 @@ function App({ actor, isAuthenticated, login }) {
 
         // Format transactions to ensure they match our expected structure
         const formattedTransactions = storedTransactions.map((t) => ({
-          id: t.id,
+          id:
+            t.id ||
+            `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           transactionType: t.transactionType,
           amount:
             typeof t.amount === "number"
@@ -373,8 +445,27 @@ function App({ actor, isAuthenticated, login }) {
           timestamp: t.timestamp || new Date().toISOString(),
         }));
 
-        console.log("Formatted transactions:", formattedTransactions);
-        setTransactions(formattedTransactions);
+        // Remove any duplicate transactions
+        const uniqueTransactions = removeDuplicateTransactions(
+          formattedTransactions
+        );
+
+        if (uniqueTransactions.length < formattedTransactions.length) {
+          console.log(
+            `Removed ${
+              formattedTransactions.length - uniqueTransactions.length
+            } duplicate transactions`
+          );
+
+          // Save the deduplicated transactions back to localStorage
+          localStorage.setItem(
+            "transactions",
+            JSON.stringify(uniqueTransactions)
+          );
+        }
+
+        console.log("Formatted transactions:", uniqueTransactions);
+        setTransactions(uniqueTransactions);
       } else {
         console.log("No transactions found in localStorage");
       }
@@ -413,13 +504,13 @@ function App({ actor, isAuthenticated, login }) {
       // Construct a prompt that's specific to extracting transaction data
       const prompt = `You are Hi! Countant, an AI accountant assistant. Please analyze this document and extract ALL financial transaction information.
 
-IMPORTANT: This file likely contains MULTIPLE transactions (like a bank statement, expense report, or accounting table). You MUST extract ALL transactions and return them as an array of transaction objects.
+IMPORTANT: This file likely contains financial transaction data. You MUST extract UNIQUE transactions and return them as an array of transaction objects.
 
-PAY SPECIAL ATTENTION TO TABULAR DATA: If the file contains a table of transactions, make sure to extract each row as a separate transaction. Look for patterns like dates, amounts, descriptions, etc. in columns.
+PAY SPECIAL ATTENTION TO TABULAR DATA: If the file contains a table of transactions, extract each row as a separate transaction. Look for patterns like dates, amounts, descriptions, etc. in columns.
 
-BE EXTREMELY THOROUGH: Scan the entire document carefully. Don't miss any transactions. Look for tables, lists, or any structured data that contains financial information. If there are multiple pages, check all of them.
+BE EXTREMELY THOROUGH BUT AVOID DUPLICATES: Scan the entire document carefully, but make sure each transaction is only included ONCE in your output. If you see the same transaction multiple times (same date, amount, and description), only include it once.
 
-For each transaction, extract the following specific information:
+For each UNIQUE transaction, extract the following specific information:
 1. Transaction type: Determine based on context - use "expense" for debits/payments/outgoing funds and "income" for credits/deposits/incoming funds
 2. Amount: Extract numeric value only (no currency symbols)
 3. Date: Convert to YYYY-MM-DD format
@@ -431,7 +522,7 @@ For each transaction, extract the following specific information:
 
 Return ONLY a valid JSON array with these fields. If you can't determine a value, use null.
 
-ALWAYS return an array of transactions, even if there's only one transaction,if there is more, return all of detected transactions, do not hallucinate, read all entire trasanctions, complete, recursively, to ensure no transaction is missing:
+ALWAYS return an array of UNIQUE transactions:
 [
   {
     "transactionType": "expense",
@@ -451,12 +542,13 @@ For tables with "Debit" and "Credit" columns:
 - Use the amount from whichever column has a value
 
 For bank statements or financial reports:
-- Extract ALL line items in the statement
+- Extract each line item in the statement ONLY ONCE
 - Pay attention to transaction dates, descriptions, and amounts
 - Look for transaction codes, reference numbers, or categories
 - If there are running balances, focus on the individual transactions, not the balance
+- If the same transaction appears multiple times (e.g., in a summary and detail section), only include it once
 
-EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
+EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array with UNIQUE transactions. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
 
 Document: ${truncatedContent}`;
 
@@ -552,9 +644,26 @@ Document: ${truncatedContent}`;
                 })
               );
 
+              // Load the most current transactions from localStorage to avoid overriding
+              const currentStoredTransactions = JSON.parse(
+                localStorage.getItem("transactions") || "[]"
+              );
+
+              // Create a map of existing transaction IDs to avoid duplicates
+              const existingTransactionIds = new Map();
+              currentStoredTransactions.forEach((t) => {
+                existingTransactionIds.set(t.id, true);
+              });
+
+              // Filter out any transactions that might be duplicates
+              const uniqueNewTransactions = formattedTransactions.filter(
+                (t) => !existingTransactionIds.has(t.id)
+              );
+
+              // Combine existing transactions with new unique ones
               const updatedTransactions = [
-                ...transactions, // Use the current transactions state
-                ...formattedTransactions,
+                ...currentStoredTransactions,
+                ...uniqueNewTransactions,
               ];
 
               setTransactions(updatedTransactions);
@@ -664,20 +773,24 @@ Document: ${truncatedContent}`;
     base64Data,
     fileName,
     fileTypeContext,
-    mimeType
+    mimeType,
+    silentMode = false
   ) {
     try {
       setAnalyzingFile(fileName);
       addProcessingLog(`Starting Gemini AI processing for ${fileName}`, "info");
 
-      Swal.fire({
-        title: "Processing document...",
-        text: `Analyzing ${fileName} with Gemini AI`,
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-      });
+      // Only show the processing popup if not in silent mode
+      if (!silentMode) {
+        Swal.fire({
+          title: "Processing document...",
+          text: `Analyzing ${fileName} with Gemini AI`,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+      }
 
       // Construct the API request with multimodal content (text + image/PDF)
       addProcessingLog(`Preparing API request to Gemini`, "info");
@@ -697,13 +810,13 @@ Document: ${truncatedContent}`;
                   {
                     text: `You are Hi! Countant, an AI accountant assistant. Please analyze this ${fileTypeContext} file and extract ALL financial transaction information.
 
-IMPORTANT: This file likely contains MULTIPLE transactions (like a bank statement, expense report, or accounting table). You MUST extract ALL transactions and return them as an array of transaction objects.
+IMPORTANT: This file likely contains financial transaction data. You MUST extract UNIQUE transactions and return them as an array of transaction objects.
 
-PAY SPECIAL ATTENTION TO TABULAR DATA: If the file contains a table of transactions, make sure to extract each row as a separate transaction. Look for patterns like dates, amounts, descriptions, etc. in columns.
+PAY SPECIAL ATTENTION TO TABULAR DATA: If the file contains a table of transactions, extract each row as a separate transaction. Look for patterns like dates, amounts, descriptions, etc. in columns.
 
-BE EXTREMELY THOROUGH: Scan the entire document carefully. Don't miss any transactions. Look for tables, lists, or any structured data that contains financial information. If there are multiple pages, check all of them.
+BE EXTREMELY THOROUGH BUT AVOID DUPLICATES: Scan the entire document carefully, but make sure each transaction is only included ONCE in your output. If you see the same transaction multiple times (same date, amount, and description), only include it once.
 
-For each transaction, extract the following specific information:
+For each UNIQUE transaction, extract the following specific information:
 1. Transaction type: Determine based on context - use "expense" for debits/payments/outgoing funds and "income" for credits/deposits/incoming funds
 2. Amount: Extract numeric value only (no currency symbols)
 3. Date: Convert to YYYY-MM-DD format
@@ -715,7 +828,7 @@ For each transaction, extract the following specific information:
 
 Return ONLY a valid JSON array with these fields. If you can't determine a value, use null.
 
-ALWAYS return an array of transactions, even if there's only one transaction:
+ALWAYS return an array of UNIQUE transactions:
 [
   {
     "transactionType": "expense",
@@ -735,12 +848,13 @@ For tables with "Debit" and "Credit" columns:
 - Use the amount from whichever column has a value
 
 For PDF bank statements or financial reports:
-- Extract ALL line items in the statement
+- Extract each line item in the statement ONLY ONCE
 - Pay attention to transaction dates, descriptions, and amounts
 - Look for transaction codes, reference numbers, or categories
 - If there are running balances, focus on the individual transactions, not the balance
+- If the same transaction appears multiple times (e.g., in a summary and detail section), only include it once
 
-EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
+EXTREMELY IMPORTANT: Your response must ONLY contain the raw JSON array with UNIQUE transactions. Do not include any explanations, markdown formatting, or code blocks. Just return the raw JSON array starting with [ and ending with ]. Nothing else.
 
 File name: ${fileName}`,
                   },
@@ -837,9 +951,26 @@ File name: ${fileName}`,
               timestamp: t.timestamp || new Date().toISOString(),
             }));
 
+            // Load the most current transactions from localStorage to avoid overriding
+            const currentStoredTransactions = JSON.parse(
+              localStorage.getItem("transactions") || "[]"
+            );
+
+            // Create a map of existing transaction IDs to avoid duplicates
+            const existingTransactionIds = new Map();
+            currentStoredTransactions.forEach((t) => {
+              existingTransactionIds.set(t.id, true);
+            });
+
+            // Filter out any transactions that might be duplicates
+            const uniqueNewTransactions = formattedTransactions.filter(
+              (t) => !existingTransactionIds.has(t.id)
+            );
+
+            // Combine existing transactions with new unique ones
             const updatedTransactions = [
-              ...transactions, // Use the current transactions state
-              ...formattedTransactions,
+              ...currentStoredTransactions,
+              ...uniqueNewTransactions,
             ];
 
             setTransactions(updatedTransactions);
@@ -889,37 +1020,39 @@ File name: ${fileName}`,
               addProcessingLog(`Marked ${fileName} as processed`, "info");
             }
 
-            // Show the extracted data in a popup for review
-            Swal.fire({
-              icon: "success",
-              title: "Document Processed",
-              html: `
-                <div class="text-left">
-                  <p>Successfully extracted and added ${
-                    transactions.length
-                  } transaction${
-                transactions.length !== 1 ? "s" : ""
-              } from ${fileName} to log trails.</p>
-                  <div class="mt-4">
-                    <h3 class="text-lg font-bold mb-2">Extracted Transactions:</h3>
-                    <div class="bg-gray-100 p-3 rounded max-h-60 overflow-auto text-sm">
-                      <pre>${JSON.stringify(
-                        transactions.slice(0, 10),
-                        null,
-                        2
-                      )}${
-                transactions.length > 10
-                  ? "\n\n... and " +
-                    (transactions.length - 10) +
-                    " more transactions"
-                  : ""
-              }</pre>
+            // Show the extracted data in a popup for review (if not in silent mode)
+            if (!silentMode) {
+              Swal.fire({
+                icon: "success",
+                title: "Document Processed",
+                html: `
+                  <div class="text-left">
+                    <p>Successfully extracted and added ${
+                      transactions.length
+                    } transaction${
+                  transactions.length !== 1 ? "s" : ""
+                } from ${fileName} to log trails.</p>
+                    <div class="mt-4">
+                      <h3 class="text-lg font-bold mb-2">Extracted Transactions:</h3>
+                      <div class="bg-gray-100 p-3 rounded max-h-60 overflow-auto text-sm">
+                        <pre>${JSON.stringify(
+                          transactions.slice(0, 10),
+                          null,
+                          2
+                        )}${
+                  transactions.length > 10
+                    ? "\n\n... and " +
+                      (transactions.length - 10) +
+                      " more transactions"
+                    : ""
+                }</pre>
+                      </div>
                     </div>
                   </div>
-                </div>
-              `,
-              width: "600px",
-            });
+                `,
+                width: "600px",
+              });
+            }
 
             return { transactions, rawContent: content };
           } catch (parseError) {
@@ -946,42 +1079,49 @@ File name: ${fileName}`,
           "warning"
         );
 
-        // Show a more detailed error message with options
-        Swal.fire({
-          icon: "warning",
-          title: "Processing Issue",
-          html: `
-            <div class="text-left">
-              <p>The document was processed, but we couldn't extract structured transaction data.</p>
-              <p class="mt-2">This could be due to:</p>
-              <ul class="list-disc pl-5 mt-1 text-sm">
-                <li>Document format not being recognized properly</li>
-                <li>No clear transaction data in the document</li>
-                <li>AI model limitations in extracting this specific format</li>
-              </ul>
-              <p class="mt-2">You can:</p>
-              <ul class="list-disc pl-5 mt-1 text-sm">
-                <li>Try processing again</li>
-                <li>Use manual data entry instead</li>
-                <li>Try a different document format</li>
-              </ul>
-            </div>
-          `,
-          confirmButtonText: "OK",
-        });
+        // Show a more detailed error message with options (if not in silent mode)
+        if (!silentMode) {
+          Swal.fire({
+            icon: "warning",
+            title: "Processing Issue",
+            html: `
+              <div class="text-left">
+                <p>The document was processed, but we couldn't extract structured transaction data.</p>
+                <p class="mt-2">This could be due to:</p>
+                <ul class="list-disc pl-5 mt-1 text-sm">
+                  <li>Document format not being recognized properly</li>
+                  <li>No clear transaction data in the document</li>
+                  <li>AI model limitations in extracting this specific format</li>
+                </ul>
+                <p class="mt-2">You can:</p>
+                <ul class="list-disc pl-5 mt-1 text-sm">
+                  <li>Try processing again</li>
+                  <li>Use manual data entry instead</li>
+                  <li>Try a different document format</li>
+                </ul>
+              </div>
+            `,
+            confirmButtonText: "OK",
+          });
+        }
 
         // Don't mark the file as processed since we couldn't extract data
         setAnalyzingFile(""); // Clear the analyzing state
         return { rawContent: content };
       }
     } catch (error) {
-      Swal.close();
+      if (!silentMode) {
+        Swal.close();
+      }
       addProcessingLog(`Processing failed: ${error.message}`, "error");
-      Swal.fire({
-        icon: "error",
-        title: "Processing Failed",
-        text: `Failed to process ${fileName}: ${error.message}`,
-      });
+
+      if (!silentMode) {
+        Swal.fire({
+          icon: "error",
+          title: "Processing Failed",
+          text: `Failed to process ${fileName}: ${error.message}`,
+        });
+      }
       console.error("AI processing failed:", error);
       setAnalyzingFile("");
       return null;
@@ -1490,6 +1630,59 @@ File name: ${fileName}`,
   }
 
   async function handleFileDelete(name) {
+    // Handle "Delete All" case
+    if (name === "ALL") {
+      Swal.fire({
+        title: "Delete All Documents?",
+        text: "Are you sure you want to delete ALL documents? This cannot be undone!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete all!",
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          try {
+            // Get the count for the notification
+            const count = files.length;
+
+            // Delete all files one by one
+            for (const file of files) {
+              await actor.deleteFile(file.name);
+            }
+
+            await loadFiles();
+
+            // Show non-intrusive toast notification
+            import("../utils/toastNotification").then(({ showToast }) => {
+              showToast(`Successfully deleted ${count} documents`, "success");
+            });
+
+            // Add to processing log
+            addProcessingLog(`Deleted ${count} documents`, "info");
+          } catch (error) {
+            console.error("Failed to delete all files:", error);
+
+            // Show error toast
+            import("../utils/toastNotification").then(({ showToast }) => {
+              showToast(
+                `Failed to delete documents: ${error.message}`,
+                "error"
+              );
+            });
+
+            // Add to processing log
+            addProcessingLog(
+              `Failed to delete documents: ${error.message}`,
+              "error"
+            );
+          }
+        }
+      });
+      return;
+    }
+
+    // Handle single file deletion
     Swal.fire({
       title: "Are you sure?",
       text: `Do you want to delete "${name}"?`,
@@ -1504,37 +1697,519 @@ File name: ${fileName}`,
           const success = await actor.deleteFile(name);
           if (success) {
             await loadFiles();
-            Swal.fire({
-              icon: "success",
-              title: "Deleted!",
-              text: `${name} has been deleted.`,
-              timer: 2000,
-              timerProgressBar: true,
+
+            // Show non-intrusive toast notification
+            import("../utils/toastNotification").then(({ showToast }) => {
+              showToast(`Document "${name}" deleted successfully`, "success");
             });
+
+            // Add to processing log
+            addProcessingLog(`Deleted document: ${name}`, "info");
           } else {
             setErrorMessage("Failed to delete file");
-            Swal.fire({
-              icon: "error",
-              title: "Delete Failed",
-              text: "Failed to delete file.",
+
+            // Show error toast
+            import("../utils/toastNotification").then(({ showToast }) => {
+              showToast("Failed to delete document", "error");
             });
           }
         } catch (error) {
           console.error("Delete failed:", error);
           setErrorMessage(`Failed to delete ${name}: ${error.message}`);
-          Swal.fire({
-            icon: "error",
-            title: "Delete Failed",
-            text: `Failed to delete ${name}: ${error.message}`,
+
+          // Show error toast
+          import("../utils/toastNotification").then(({ showToast }) => {
+            showToast(`Failed to delete document: ${error.message}`, "error");
           });
         }
       }
     });
   }
 
+  // Function to generate fake transactions
+  async function generateFakeTransactions(count) {
+    try {
+      // Import the PDF generator dynamically
+      const { generateTransactionPDF } = await import("../utils/pdfGenerator");
+
+      // Categories for fake data - expanded for more variety
+      const transactionTypes = [
+        "expense",
+        "income",
+        "transfer",
+        "asset",
+        "liability",
+      ];
+
+      const expenseCategories = [
+        "Advertising",
+        "Office Supplies",
+        "Rent",
+        "Utilities",
+        "Travel",
+        "Consulting",
+        "Insurance",
+        "Meals & Entertainment",
+        "Software Subscriptions",
+        "Professional Development",
+        "Legal Fees",
+        "Accounting Services",
+        "Repairs & Maintenance",
+        "Shipping & Postage",
+        "Printing",
+        "Vehicle Expenses",
+        "Telephone",
+        "Internet",
+        "Employee Benefits",
+        "Salaries & Wages",
+        "Contractor Payments",
+        "Bank Fees",
+        "Interest Expense",
+        "Taxes",
+        "Licenses & Permits",
+        "Dues & Subscriptions",
+      ];
+
+      const incomeCategories = [
+        "Sales",
+        "Services",
+        "Interest Income",
+        "Dividends",
+        "Royalties",
+        "Rental Income",
+        "Commission",
+        "Consulting Revenue",
+        "Product Sales",
+        "Affiliate Income",
+        "Sponsorship",
+        "Grants",
+        "Donations",
+        "Refunds",
+        "Investment Returns",
+        "Asset Sales",
+        "Licensing Fees",
+      ];
+
+      const transferCategories = [
+        "Bank Transfer",
+        "Credit Card Payment",
+        "Loan Payment",
+        "Investment Transfer",
+        "Savings Transfer",
+        "Retirement Contribution",
+        "Tax Payment",
+        "Payroll Transfer",
+        "Vendor Payment",
+        "Customer Refund",
+        "Expense Reimbursement",
+      ];
+
+      const assetCategories = [
+        "Equipment Purchase",
+        "Vehicle Purchase",
+        "Property Acquisition",
+        "Furniture & Fixtures",
+        "Computer Hardware",
+        "Software Licenses",
+        "Investment Purchase",
+        "Inventory",
+        "Intellectual Property",
+      ];
+
+      const liabilityCategories = [
+        "Loan Proceeds",
+        "Credit Line",
+        "Mortgage",
+        "Equipment Financing",
+        "Accounts Payable",
+        "Tax Liability",
+        "Payroll Liabilities",
+        "Customer Deposits",
+      ];
+
+      const paymentMethods = [
+        "cash",
+        "credit",
+        "debit",
+        "transfer",
+        "check",
+        "wire",
+        "PayPal",
+        "Venmo",
+        "Zelle",
+        "ACH",
+        "Apple Pay",
+        "Google Pay",
+        "Bitcoin",
+        "Cryptocurrency",
+      ];
+
+      const companies = [
+        "Acme Corp",
+        "TechSolutions",
+        "Global Services",
+        "Local Shop",
+        "Office Depot",
+        "Amazon",
+        "Staples",
+        "AT&T",
+        "Verizon",
+        "Comcast",
+        "Microsoft",
+        "Google",
+        "Apple",
+        "Dell",
+        "HP",
+        "Lenovo",
+        "Samsung",
+        "LG",
+        "Sony",
+        "Panasonic",
+        "Best Buy",
+        "Walmart",
+        "Target",
+        "Costco",
+        "Home Depot",
+        "Lowe's",
+        "FedEx",
+        "UPS",
+        "USPS",
+        "DHL",
+        "Uber",
+        "Lyft",
+        "Airbnb",
+        "Hilton",
+        "Marriott",
+        "Southwest Airlines",
+        "Delta Airlines",
+        "United Airlines",
+        "Enterprise",
+        "Hertz",
+        "Avis",
+        "Shell",
+        "BP",
+        "Exxon",
+        "Chevron",
+        "Starbucks",
+        "McDonald's",
+        "Subway",
+        "Chipotle",
+        "Whole Foods",
+      ];
+
+      // Descriptions for more variety
+      const expenseDescriptions = [
+        "Payment for {service}",
+        "Monthly subscription to {service}",
+        "Purchase from {company}",
+        "Invoice payment to {company}",
+        "Quarterly payment for {service}",
+        "Annual subscription to {service}",
+        "Maintenance service from {company}",
+        "Consulting services from {company}",
+        "Equipment rental from {company}",
+        "Software license renewal for {service}",
+        "Professional services from {company}",
+        "Office supplies from {company}",
+        "Utility payment to {company}",
+        "Insurance premium to {company}",
+      ];
+
+      const incomeDescriptions = [
+        "Payment from {client}",
+        "Invoice {number} from {client}",
+        "Monthly retainer from {client}",
+        "Service fee from {client}",
+        "Product sale to {client}",
+        "Consulting fee from {client}",
+        "Commission from {client}",
+        "Royalty payment from {client}",
+        "Project completion payment from {client}",
+        "Milestone payment from {client}",
+      ];
+
+      // Create a progress bar element
+      const progressBarContainer = document.createElement("div");
+      progressBarContainer.style.position = "fixed";
+      progressBarContainer.style.top = "0";
+      progressBarContainer.style.left = "0";
+      progressBarContainer.style.width = "100%";
+      progressBarContainer.style.zIndex = "9999";
+
+      const progressBar = document.createElement("div");
+      progressBar.style.height = "4px";
+      progressBar.style.width = "0%";
+      progressBar.style.backgroundColor = "#10B981"; // Green color
+      progressBar.style.transition = "width 0.3s ease";
+
+      progressBarContainer.appendChild(progressBar);
+      document.body.appendChild(progressBarContainer);
+
+      // Create a status element
+      const statusElement = document.createElement("div");
+      statusElement.style.position = "fixed";
+      statusElement.style.top = "10px";
+      statusElement.style.right = "10px";
+      statusElement.style.padding = "8px 12px";
+      statusElement.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+      statusElement.style.color = "white";
+      statusElement.style.borderRadius = "4px";
+      statusElement.style.fontSize = "14px";
+      statusElement.style.zIndex = "9999";
+      statusElement.style.maxWidth = "300px";
+      statusElement.style.boxShadow = "0 2px 10px rgba(0, 0, 0, 0.2)";
+      statusElement.textContent = `Generating transaction 0/${count}`;
+
+      document.body.appendChild(statusElement);
+
+      // Create a batch of transactions to process
+      const transactionsToProcess = [];
+
+      // Generate all transaction data first
+      for (let i = 0; i < count; i++) {
+        // Update progress
+        progressBar.style.width = `${Math.round((i / count) * 50)}%`; // First half of progress is generating data
+        statusElement.textContent = `Generating transaction ${i + 1}/${count}`;
+
+        // Generate random transaction type
+        const transactionType =
+          transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
+
+        // Select appropriate category based on transaction type
+        let category;
+        let description;
+        let company = companies[Math.floor(Math.random() * companies.length)];
+        let service =
+          expenseCategories[
+            Math.floor(Math.random() * expenseCategories.length)
+          ].toLowerCase();
+        let client = companies[Math.floor(Math.random() * companies.length)];
+        let invoiceNumber = Math.floor(Math.random() * 10000) + 1000;
+
+        if (transactionType === "expense") {
+          category =
+            expenseCategories[
+              Math.floor(Math.random() * expenseCategories.length)
+            ];
+          // Use expense descriptions with replacements
+          const descTemplate =
+            expenseDescriptions[
+              Math.floor(Math.random() * expenseDescriptions.length)
+            ];
+          description = descTemplate
+            .replace("{service}", service)
+            .replace("{company}", company);
+        } else if (transactionType === "income") {
+          category =
+            incomeCategories[
+              Math.floor(Math.random() * incomeCategories.length)
+            ];
+          // Use income descriptions with replacements
+          const descTemplate =
+            incomeDescriptions[
+              Math.floor(Math.random() * incomeDescriptions.length)
+            ];
+          description = descTemplate
+            .replace("{client}", client)
+            .replace("{number}", invoiceNumber);
+        } else if (transactionType === "transfer") {
+          category =
+            transferCategories[
+              Math.floor(Math.random() * transferCategories.length)
+            ];
+          description = `${category} - ${
+            Math.random() > 0.5 ? "Outgoing" : "Incoming"
+          }`;
+        } else if (transactionType === "asset") {
+          category =
+            assetCategories[Math.floor(Math.random() * assetCategories.length)];
+          description = `${category} - ${company}`;
+        } else if (transactionType === "liability") {
+          category =
+            liabilityCategories[
+              Math.floor(Math.random() * liabilityCategories.length)
+            ];
+          description = `${category} - ${company}`;
+        }
+
+        // Generate a random date within the last year, with more recent dates more likely
+        const today = new Date();
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+        // Use a weighted random to favor more recent dates (square the random value)
+        const randomWeight = Math.random() * Math.random(); // Squaring makes recent dates more likely
+        const randomDate = new Date(
+          oneYearAgo.getTime() +
+            randomWeight * (today.getTime() - oneYearAgo.getTime())
+        );
+        const dateString = randomDate.toISOString().split("T")[0];
+
+        // Generate random amount with different ranges based on transaction type
+        let amount;
+        if (transactionType === "expense") {
+          // Expenses tend to be smaller
+          amount =
+            Math.round((10 + Math.random() * Math.random() * 2000) * 100) / 100;
+        } else if (transactionType === "income") {
+          // Income can be larger
+          amount = Math.round((100 + Math.random() * 9900) * 100) / 100;
+        } else if (
+          transactionType === "asset" ||
+          transactionType === "liability"
+        ) {
+          // Assets and liabilities tend to be much larger
+          amount = Math.round((500 + Math.random() * 49500) * 100) / 100;
+        } else {
+          // Transfers can vary
+          amount = Math.round((50 + Math.random() * 4950) * 100) / 100;
+        }
+
+        // Create transaction data
+        const transactionData = {
+          transactionType,
+          amount,
+          date: dateString,
+          description,
+          category,
+          paymentMethod:
+            paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+          reference: `REF-${Math.floor(Math.random() * 10000) + 10000}`,
+          taxDeductible: transactionType === "expense" && Math.random() > 0.3, // Most expenses are tax deductible
+          notes: "Auto-generated transaction",
+          timestamp: new Date().toISOString(),
+        };
+
+        transactionsToProcess.push(transactionData);
+
+        // Small delay to keep UI responsive
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
+      // Now process all transactions (generate PDFs and upload)
+      let processedCount = 0;
+      let filesToProcess = [];
+
+      for (const transactionData of transactionsToProcess) {
+        processedCount++;
+
+        // Update progress
+        const totalProgress = 50 + Math.round((processedCount / count) * 50); // Second half of progress
+        progressBar.style.width = `${totalProgress}%`;
+        statusElement.textContent = `Processing transaction ${processedCount}/${count}`;
+
+        // Generate PDF
+        const pdfBlob = generateTransactionPDF(transactionData);
+
+        // Create a filename based on the transaction data
+        const date = new Date(transactionData.date).toISOString().split("T")[0];
+        const type =
+          transactionData.transactionType.charAt(0).toUpperCase() +
+          transactionData.transactionType.slice(1);
+        const amountStr = parseFloat(transactionData.amount)
+          .toFixed(2)
+          .replace(".", "_");
+        const timestamp = Date.now().toString().slice(-6) + processedCount; // Use last 6 digits of timestamp + index for uniqueness
+        const fileName = `Transaction_${date}_${type}_${amountStr}_${timestamp}.pdf`;
+
+        // Upload the PDF to the backend
+        await uploadPdfToBackend(pdfBlob, fileName);
+
+        // Add to list of files to process with Gemini
+        filesToProcess.push(fileName);
+
+        // Process files in batches of 10 or at the end
+        if (processedCount % 10 === 0 || processedCount === count) {
+          await loadFiles(); // Refresh the file list
+
+          // Process the last file in the batch with Gemini
+          // This will be enough to demonstrate the processing is happening
+          const lastFileName = filesToProcess[filesToProcess.length - 1];
+
+          statusElement.textContent = `Processing documents with AI (batch ${Math.ceil(
+            processedCount / 10
+          )} of ${Math.ceil(count / 10)})`;
+
+          // Get the file from the backend
+          const fileData = await handleFileDownload(lastFileName, true);
+
+          if (fileData) {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+              const base64Content = e.target.result.split(",")[1]; // Remove the data URL prefix
+
+              // Process the PDF with Gemini
+              await processDocumentWithBinaryData(
+                base64Content,
+                lastFileName,
+                "PDF",
+                "application/pdf",
+                true // Silent mode - don't show additional popups
+              );
+            };
+            reader.readAsDataURL(fileData);
+          }
+
+          // Clear the batch
+          filesToProcess = [];
+        }
+
+        // Small delay to keep UI responsive
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      // Final refresh of files
+      await loadFiles();
+
+      // Remove progress bar and status element
+      document.body.removeChild(progressBarContainer);
+      document.body.removeChild(statusElement);
+
+      Swal.fire({
+        icon: "success",
+        title: "Fake Transactions Generated",
+        text: `Successfully created ${count} fake transactions!`,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Failed to generate fake transactions:", error);
+
+      // Remove progress bar and status element if they exist
+      if (document.body.contains(progressBarContainer)) {
+        document.body.removeChild(progressBarContainer);
+      }
+      if (document.body.contains(statusElement)) {
+        document.body.removeChild(statusElement);
+      }
+
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: `Failed to generate fake transactions: ${error.message}`,
+      });
+      return false;
+    }
+  }
+
   // Function to handle saving manual data entries
   async function handleSaveManualData(data) {
     try {
+      // Check if this is a request to generate fake transactions
+      if (data.generateFake && data.count) {
+        Swal.fire({
+          title: "Generating Fake Transactions...",
+          text: `Please wait while we create ${data.count} fake transactions`,
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+
+        await generateFakeTransactions(data.count);
+        return true;
+      }
+
       Swal.fire({
         title: "Generating Document...",
         text: "Please wait while we create your transaction record",
@@ -2018,7 +2693,7 @@ File name: ${fileName}`,
                   )}
 
                   {activeSubTab === "validation" && (
-                    <Validation 
+                    <Validation
                       transactions={transactions}
                       onViewTransaction={handleViewTransaction}
                       onExportTransactions={handleExportTransactions}
@@ -2026,21 +2701,15 @@ File name: ${fileName}`,
                   )}
 
                   {activeSubTab === "analysis" && (
-                    <Analysis
-                      transactions={transactions} 
-                    />
+                    <Analysis transactions={transactions} />
                   )}
 
-                  {activeSubTab === "reports" && ( 
-                    <Reports 
-                    transactions={transactions} 
-                  />
+                  {activeSubTab === "reports" && (
+                    <Reports transactions={transactions} />
                   )}
 
                   {activeSubTab === "recommendations" && (
-                    <Recommendations 
-                    transactions={transactions} 
-                  />
+                    <Recommendations transactions={transactions} />
                   )}
                 </>
               )}
@@ -2048,15 +2717,26 @@ File name: ${fileName}`,
               {activeMainCategory === "advisor" && (
                 <>
                   {activeSubTab === "financial-planning" && (
-                    <FinancialPlanning transactions={transactions} isLoading={isLoading} />
+                    <FinancialPlanning
+                      transactions={transactions}
+                      isLoading={isLoading}
+                    />
                   )}
                   {activeSubTab === "investment" && (
-                    <Investment transactions={transactions} isLoading={isLoading} />
+                    <Investment
+                      transactions={transactions}
+                      isLoading={isLoading}
+                    />
                   )}
                   {activeSubTab === "tax-strategy" && (
-                    <TaxStrategy transactions={transactions} isLoading={isLoading} />
+                    <TaxStrategy
+                      transactions={transactions}
+                      isLoading={isLoading}
+                    />
                   )}
-                  {["financial-planning", "investment", "tax-strategy"].indexOf(activeSubTab) === -1 && (
+                  {["financial-planning", "investment", "tax-strategy"].indexOf(
+                    activeSubTab
+                  ) === -1 && (
                     <div className="flex items-center justify-center h-64 bg-gray-900 border border-blue-900/30 rounded-lg">
                       <div className="text-center">
                         <Users className="h-12 w-12 text-blue-500 mx-auto mb-4" />

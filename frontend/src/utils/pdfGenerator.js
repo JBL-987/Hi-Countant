@@ -139,7 +139,21 @@ export const generateTransactionPDF = (transaction) => {
 
     // Split notes into lines to handle long text
     const splitNotes = doc.splitTextToSize(transaction.notes, 170);
-    doc.text(splitNotes, 15, notesY + 20);
+
+    // Use autotable for notes to prevent text overlap
+    autoTable(doc, {
+      startY: notesY + 12,
+      head: [],
+      body: [[splitNotes.join("\n")]],
+      theme: "plain",
+      styles: {
+        fontSize: 10,
+        cellPadding: 5,
+        overflow: "linebreak",
+        lineWidth: 0,
+      },
+      margin: { left: 15, right: 15 },
+    });
   }
 
   // Add footer

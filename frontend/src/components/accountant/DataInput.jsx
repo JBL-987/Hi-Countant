@@ -6,6 +6,9 @@ import {
   Calculator,
   FileUp,
   PenLine,
+  Trash2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import ManualDataInput from "./ManualDataInput";
 
@@ -30,6 +33,8 @@ const DataInput = ({
   onProcessingModeChange,
 }) => {
   const [inputMode, setInputMode] = useState("file"); // 'file' or 'manual'
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectMode, setSelectMode] = useState(false);
 
   const handleSaveManualData = (data) => {
     if (onSaveManualData) {
@@ -45,7 +50,30 @@ const DataInput = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-white">Data Input</h1>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <input
+              type="number"
+              min="1"
+              max="100"
+              defaultValue="10"
+              id="fakeTransactionCount"
+              className="w-16 bg-gray-800 border border-gray-700 rounded-md py-1 px-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+            />
+            <button
+              onClick={() => {
+                const count =
+                  parseInt(
+                    document.getElementById("fakeTransactionCount").value
+                  ) || 10;
+                onSaveManualData &&
+                  onSaveManualData({ generateFake: true, count: count });
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-md hover:opacity-90 flex items-center text-sm"
+            >
+              Generate Fake Transactions
+            </button>
+          </div>
           <span className="text-sm text-gray-400">Last updated: Today</span>
         </div>
       </div>
@@ -241,9 +269,63 @@ const DataInput = ({
 
           {/* Document List */}
           <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
-            <h2 className="mb-6 text-xl font-bold text-white">
-              Your Documents
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Your Documents</h2>
+              {files.length > 0 && (
+                <div className="flex items-center space-x-3">
+                  {selectMode && selectedFiles.length > 0 && (
+                    <button
+                      onClick={() => {
+                        // Delete selected files
+                        selectedFiles.forEach((fileName) => {
+                          handleFileDelete && handleFileDelete(fileName);
+                        });
+                        setSelectedFiles([]);
+                        setSelectMode(false);
+                      }}
+                      className="px-3 py-2 bg-red-900/30 text-red-400 rounded-md hover:bg-red-900/50 transition-colors flex items-center text-sm"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected ({selectedFiles.length})
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (selectMode) {
+                        setSelectMode(false);
+                        setSelectedFiles([]);
+                      } else {
+                        setSelectMode(true);
+                      }
+                    }}
+                    className={`px-3 py-2 ${
+                      selectMode
+                        ? "bg-blue-900/50 text-blue-300"
+                        : "bg-blue-900/30 text-blue-400"
+                    } rounded-md hover:bg-blue-900/50 transition-colors flex items-center text-sm`}
+                  >
+                    {selectMode ? (
+                      <>
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        Cancel Selection
+                      </>
+                    ) : (
+                      <>
+                        <Square className="h-4 w-4 mr-2" />
+                        Select Multiple
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleFileDelete && handleFileDelete("ALL")}
+                    className="px-3 py-2 bg-red-900/30 text-red-400 rounded-md hover:bg-red-900/50 transition-colors flex items-center text-sm"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete All
+                  </button>
+                </div>
+              )}
+            </div>
 
             {isLoading ? (
               <div className="py-12 text-center">
@@ -265,6 +347,26 @@ const DataInput = ({
                     className="flex flex-col items-start justify-between gap-4 py-4 sm:flex-row sm:items-center"
                   >
                     <div className="flex items-center space-x-3">
+                      {selectMode && (
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => {
+                            if (selectedFiles.includes(file.name)) {
+                              setSelectedFiles(
+                                selectedFiles.filter((f) => f !== file.name)
+                              );
+                            } else {
+                              setSelectedFiles([...selectedFiles, file.name]);
+                            }
+                          }}
+                        >
+                          {selectedFiles.includes(file.name) ? (
+                            <CheckSquare className="h-5 w-5 text-blue-500" />
+                          ) : (
+                            <Square className="h-5 w-5 text-gray-500" />
+                          )}
+                        </div>
+                      )}
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-800">
                         {getFileIcon(file.name)}
                       </div>
