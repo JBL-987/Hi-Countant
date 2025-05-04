@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, BarChart3, TrendingUp, ArrowUpRight, ArrowDownRight, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 const FinancialPlanning = ({ transactions }) => {
   const [financialGoals, setFinancialGoals] = useState([
