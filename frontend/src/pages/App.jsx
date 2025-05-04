@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Logo from "../components/Logo";
+import { storeDocumentPosition } from "../utils/documentPositionTracker";
 
 // Import Accountant components
 import DataInput from "../components/accountant/DataInput";
@@ -980,13 +981,34 @@ File name: ${fileName}`,
             // This ensures that when a user clicks "Process File", the transactions are added
             addProcessingLog(`Adding transactions to log trails`, "info");
 
-            // Add file reference and timestamp to each transaction
-            const timestampedTransactions = transactions.map((transaction) => ({
-              ...transaction,
-              sourceFile: fileName,
-              timestamp: new Date().toISOString(),
-              id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            }));
+            // Add file reference, timestamp, and position data to each transaction
+            const timestampedTransactions = transactions.map((transaction) => {
+              // Generate a unique ID for this transaction
+              const transactionId = `${Date.now()}-${Math.random()
+                .toString(36)
+                .substring(2, 9)}`;
+
+              // Store document position data for validation
+              const extractionData = {
+                pageNumber: transaction.pageNumber || 1,
+                lineNumber: transaction.lineNumber || null,
+                position: transaction.position || null,
+                extractedText: transaction.description || null,
+                confidence: transaction.confidence || 0.9,
+                extractionMethod: "gemini-ai",
+              };
+
+              // Store the position data for this transaction
+              storeDocumentPosition(transactionId, fileName, extractionData);
+
+              // Return the transaction with additional metadata
+              return {
+                ...transaction,
+                sourceFile: fileName,
+                timestamp: new Date().toISOString(),
+                id: transactionId,
+              };
+            });
 
             // Fix: We need to make sure the transaction structure matches what the backend expects
             const formattedTransactions = timestampedTransactions.map((t) => ({
@@ -2975,6 +2997,8 @@ File name: ${fileName}`,
                       transactions={transactions}
                       onViewTransaction={handleViewTransaction}
                       onExportTransactions={handleExportTransactions}
+                      files={files}
+                      handleFileDownload={handleFileDownload}
                     />
                   )}
 
