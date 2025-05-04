@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, BarChart3, TrendingUp, ArrowUpRight, ArrowDownRight, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 const Investment = ({ transactions }) => {
   const [portfolio, setPortfolio] = useState([{
@@ -70,7 +70,126 @@ const Investment = ({ transactions }) => {
   };
 
   const analyzeInvestments = (transactions) => {
-    // ... existing analysis logic ...
+    // Filter investment transactions
+    const investmentTransactions = transactions.filter(t => 
+      t.category === 'investment' || t.transactionType === 'investment'
+    );
+    
+    if (investmentTransactions.length === 0) {
+      setEmptyState();
+      return;
+    }
+
+    // Calculate portfolio allocation
+    const investmentTypes = {};
+    let totalInvestmentAmount = 0;
+    
+    investmentTransactions.forEach(transaction => {
+      const type = transaction.subCategory || 'Other';
+      const amount = parseFloat(transaction.amount || 0);
+      
+      if (!investmentTypes[type]) {
+        investmentTypes[type] = 0;
+      }
+      
+      investmentTypes[type] += amount;
+      totalInvestmentAmount += amount;
+    });
+    
+    // Create portfolio array with percentages
+    const portfolioArray = Object.keys(investmentTypes).map(type => {
+      const amount = investmentTypes[type];
+      const percentage = totalInvestmentAmount > 0 
+        ? Math.round((amount / totalInvestmentAmount) * 100)
+        : 0;
+        
+      return {
+        type,
+        amount,
+        percentage
+      };
+    });
+    
+    // Sort portfolio by amount (descending)
+    portfolioArray.sort((a, b) => b.amount - a.amount);
+    setPortfolio(portfolioArray);
+    
+    // Calculate diversification metrics
+    const assetClasses = portfolioArray.length;
+    const primaryAllocation = portfolioArray.length > 0 ? portfolioArray[0].percentage : 0;
+    
+    let diversificationScore = 'needs improvement';
+    if (assetClasses >= 5 && primaryAllocation <= 40) {
+      diversificationScore = 'excellent';
+    } else if (assetClasses >= 3 && primaryAllocation <= 60) {
+      diversificationScore = 'good';
+    }
+    
+    setDiversification({
+      assetClasses,
+      primaryAllocation,
+      score: diversificationScore
+    });
+    
+    // Calculate returns
+    // For demonstration purposes, we'll calculate based on transaction metadata
+    // In a real app, you would use actual historical performance data
+    let totalReturns = 0;
+    let positiveReturns = 0;
+    let negativeReturns = 0;
+    
+    investmentTransactions.forEach(transaction => {
+      const returnAmount = parseFloat(transaction.returnAmount || 0);
+      totalReturns += returnAmount;
+      
+      if (returnAmount > 0) {
+        positiveReturns += returnAmount;
+      } else if (returnAmount < 0) {
+        negativeReturns += Math.abs(returnAmount);
+      }
+    });
+    
+    // Calculate ROI (Return on Investment)
+    const roi = totalInvestmentAmount > 0 
+      ? ((totalReturns / totalInvestmentAmount) * 100).toFixed(2)
+      : 0;
+    
+    setReturns({
+      total: totalReturns,
+      positive: positiveReturns,
+      negative: negativeReturns,
+      roi
+    });
+    
+    // Calculate risk assessment
+    // For demonstration, we'll classify risk based on asset type
+    // In a real app, you would use volatility, beta, or other risk metrics
+    const highRiskTypes = ['crypto', 'options', 'penny_stocks', 'futures'];
+    
+    let highRiskAmount = 0;
+    investmentTransactions.forEach(transaction => {
+      const type = (transaction.subCategory || '').toLowerCase();
+      if (highRiskTypes.includes(type)) {
+        highRiskAmount += parseFloat(transaction.amount || 0);
+      }
+    });
+    
+    const highRiskPercentage = totalInvestmentAmount > 0 
+      ? Math.round((highRiskAmount / totalInvestmentAmount) * 100)
+      : 0;
+    
+    let riskLevel = 'low';
+    if (highRiskPercentage >= 50) {
+      riskLevel = 'high';
+    } else if (highRiskPercentage >= 25) {
+      riskLevel = 'moderate';
+    }
+    
+    setRiskAssessment({
+      highRisk: highRiskAmount,
+      percentage: highRiskPercentage,
+      level: riskLevel
+    });
   };
 
   const formatCurrency = (amount) => {

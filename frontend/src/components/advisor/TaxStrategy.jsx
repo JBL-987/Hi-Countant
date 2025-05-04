@@ -52,7 +52,97 @@ const TaxStrategy = ({ transactions }) => {
   };
 
   const analyzeTaxStrategy = (transactions) => {
-    // ... existing analysis logic ...
+    // Perhitungan pendapatan dan pengeluaran
+    const totalIncome = transactions
+      .filter(t => t.transactionType === 'income')
+      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+    const totalExpenses = transactions
+      .filter(t => t.transactionType === 'expense')
+      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+    // Perhitungan aset dan kewajiban
+    const totalAssets = transactions
+      .filter(t => t.category === 'asset')
+      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+    const totalLiabilities = transactions
+      .filter(t => t.category === 'liability' || t.category === 'debt')
+      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+    // Perhitungan pajak yang diperkirakan (25% dari pendapatan setelah dikurangi pengeluaran yang memenuhi syarat)
+    const taxableIncome = totalIncome - totalExpenses;
+    const taxRate = 0.25; // 25% tax rate
+    const calculatedTax = Math.max(0, taxableIncome * taxRate);
+    setEstimatedTax(calculatedTax);
+
+    // Mengkategorikan kewajiban pajak berdasarkan data aktual transaksi
+    // Identifikasi jenis pajak dari transaksi
+    const taxCategories = {};
+    
+    transactions
+      .filter(t => t.transactionType === 'expense' && t.category === 'tax')
+      .forEach(transaction => {
+        const taxType = transaction.subcategory || 'Other Taxes';
+        if (!taxCategories[taxType]) {
+          taxCategories[taxType] = 0;
+        }
+        taxCategories[taxType] += parseFloat(transaction.amount || 0);
+      });
+    
+    // Jika tidak ada data pajak dalam transaksi, gunakan estimasi berdasarkan penghasilan
+    if (Object.keys(taxCategories).length === 0) {
+      // Estimasi pajak penghasilan berdasarkan struktur pajak umum
+      taxCategories['Federal Income Tax'] = calculatedTax * 0.6;
+      taxCategories['State Income Tax'] = calculatedTax * 0.25;
+      taxCategories['Local Tax'] = calculatedTax * 0.1;
+      taxCategories['Other Taxes'] = calculatedTax * 0.05;
+    }
+    
+    // Konversi ke format yang diperlukan dengan persentase aktual
+    const totalTaxAmount = Object.values(taxCategories).reduce((sum, amount) => sum + amount, 0);
+    
+    const formattedTaxLiabilities = Object.entries(taxCategories).map(([type, amount]) => ({
+      type,
+      amount,
+      percentage: totalTaxAmount > 0 ? Math.round((amount / totalTaxAmount) * 100) : 0
+    }));
+    
+    // Urutkan dari yang terbesar ke terkecil
+    formattedTaxLiabilities.sort((a, b) => b.amount - a.amount);
+    
+    setTaxLiabilities(formattedTaxLiabilities);
+
+    // Perhitungan potensi pengurangan pajak
+    const possibleDeductions = [
+      {
+        category: 'Charitable Contributions',
+        amount: totalExpenses * 0.05, // Contoh: 5% dari pengeluaran adalah sumbangan amal
+        limit: totalIncome * 0.6 // Batas 60% dari AGI
+      },
+      {
+        category: 'Business Expenses',
+        amount: totalExpenses * 0.3, // Contoh: 30% dari pengeluaran adalah bisnis
+        limit: totalIncome // Tidak ada batas spesifik
+      },
+      {
+        category: 'Medical Expenses',
+        amount: totalExpenses * 0.08, // Contoh: 8% dari pengeluaran adalah medis
+        limit: totalIncome * 0.075 // Hanya yang melebihi 7.5% dari AGI
+      }
+    ];
+    
+    setDeductions(possibleDeductions);
+    
+    const totalDeductionsAmount = possibleDeductions.reduce((sum, d) => {
+      const deductibleAmount = d.category === 'Medical Expenses' 
+        ? Math.max(0, d.amount - d.limit) 
+        : Math.min(d.amount, d.limit); 
+      return sum + deductibleAmount;
+    }, 0);
+    
+    const taxSavingsAmount = totalDeductionsAmount * taxRate;
+    setTaxSavings(taxSavingsAmount);
   };
 
   const formatCurrency = (amount) => {
@@ -92,7 +182,6 @@ const TaxStrategy = ({ transactions }) => {
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
           <div className="flex items-center gap-2 mb-4">
@@ -116,13 +205,12 @@ const TaxStrategy = ({ transactions }) => {
             <h3 className="text-gray-300 font-medium">Total Deductions</h3>
           </div>
           <p className="text-2xl font-bold text-white">
-            {formatCurrency(deductions.reduce((sum, d) => sum + d.amount, 0))}
+            {formatCurrency(deductions.reduce((sum, d) => sum + Math.min(d.amount, d.limit), 0))}
           </p>
           <p className="text-sm text-gray-400 mt-2">Across categories</p>
         </div>
       </div>
 
-      {/* Tax Liabilities Breakdown */}
       {taxLiabilities.length > 0 && (
         <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
           <h2 className="mb-6 text-xl font-bold text-white">Tax Liabilities by Type</h2>
@@ -146,7 +234,6 @@ const TaxStrategy = ({ transactions }) => {
         </div>
       )}
 
-      {/* Deductions Breakdown */}
       {deductions.length > 0 && (
         <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
           <h2 className="mb-6 text-xl font-bold text-white">Deductions Analysis</h2>
@@ -166,7 +253,7 @@ const TaxStrategy = ({ transactions }) => {
                       ></div>
                     </div>
                     <p className="text-xs text-gray-400 text-right mt-1">
-                      {Math.min((deduction.amount / deduction.limit) * 100, 100).toFixed(0)}%
+                      {deduction.limit > 0 ? Math.min((deduction.amount / deduction.limit) * 100, 100).toFixed(0) : 0}%
                     </p>
                   </div>
                   <div className="text-right text-sm">
@@ -184,7 +271,6 @@ const TaxStrategy = ({ transactions }) => {
         </div>
       )}
 
-      {/* Recommendations */}
       <div className="rounded-xl bg-gray-900 border border-blue-900/30 p-6 shadow-lg">
         <h2 className="mb-6 text-xl font-bold text-white">Tax Strategy Recommendations</h2>
         <ul className="list-disc pl-5 space-y-2 text-gray-300">

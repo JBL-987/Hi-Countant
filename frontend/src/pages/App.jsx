@@ -51,6 +51,7 @@ function App({ actor, isAuthenticated, login }) {
   const [activeMainCategory, setActiveMainCategory] = useState("accountant");
   const [activeSubTab, setActiveSubTab] = useState("data-input");
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [ManualEntries, setManualEntries] = useState([]);
 
   // Processing log state
   const [processingLogs, setProcessingLogs] = useState([]);
