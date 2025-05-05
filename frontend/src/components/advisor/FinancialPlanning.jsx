@@ -103,26 +103,29 @@ const FinancialPlanning = ({ transactions }) => {
     });
   };
 
-  const analyzeFinancialPlan = (transactions) => {
-    const totalIncome = transactions
-      .filter(t => t.transactionType === 'income')
-      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+  const analyzeFinancialPlan = async (transactions) => {
+    const logTrailsTransactions = await getTransactionsForDocument();
+    const combinedTransactions = [...transactions, ...logTrailsTransactions];
 
-    const totalExpenses = transactions
-      .filter(t => t.transactionType === 'expense')
-      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+    const totalIncome = combinedTransactions
+    .filter(t => t.transactionType === 'income')
+    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    const totalAssets = transactions
-      .filter(t => t.category === 'asset')
-      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+    const totalExpenses = combinedTransactions
+    .filter(t => t.transactionType === 'expense')
+    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    const totalLiabilities = transactions
-      .filter(t => t.category === 'liability' || t.category === 'debt')
-      .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+    const totalAssets = combinedTransactions
+    .filter(t => t.category === 'asset')
+    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+    const totalLiabilities = combinedTransactions
+    .filter(t => t.category === 'liability' || t.category === 'debt')
+    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
     const calculatedNetWorth = totalAssets - totalLiabilities;
     setNetWorth(calculatedNetWorth);
-
+    
     const monthlyExpenses = totalExpenses / 12;
     const emergencyFundMonths = totalAssets > 0 ? 
       Math.floor((totalAssets / monthlyExpenses) * 100) / 100 : 0;
