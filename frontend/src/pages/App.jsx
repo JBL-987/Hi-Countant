@@ -22,6 +22,7 @@ import {
 import Swal from "sweetalert2";
 import Logo from "../components/Logo";
 import { storeDocumentPosition } from "../utils/documentPositionTracker";
+import { validateTransactions } from '../utils/transactionUtils';
 
 // Import Accountant components
 import DataInput from "../components/accountant/DataInput";

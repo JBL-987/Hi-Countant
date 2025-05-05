@@ -9,7 +9,7 @@ import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Option "mo:base/Option";
 import Float "mo:base/Float";
-import Buffer "mo:base/Buffer";
+import Error "mo:base/Error";
 
 persistent actor Filevault {
 
@@ -48,7 +48,16 @@ persistent actor Filevault {
   // Define a data type for storing transactions associated with a user principal.
   type UserTransactions = [Transaction];
 
-  // HashMap to store the user data
+  // Define error types
+  type Error = {
+    #FileNotFound;
+    #InvalidInput;
+    #Unauthorized;
+    #TransactionNotFound;
+  };
+
+  // HashMap to store the user data - now with stable storage
+  private stable var stableFiles : [(Principal, [(Text, File)])] = [];
   private var files = HashMap.new<Principal, UserFiles>();
 
   // HashMap to store user transactions - using 'stable' to persist across upgrades
@@ -57,7 +66,17 @@ persistent actor Filevault {
 
   // System functions for persistence
   system func preupgrade() {
-    // Convert HashMap to array of tuples for stable storage
+    // Convert files HashMap to stable storage
+    stableFiles := [];
+    for ((principal, userFiles) in HashMap.entries(files)) {
+      var userFileEntries : [(Text, File)] = [];
+      for ((fileName, file) in HashMap.entries(userFiles)) {
+        userFileEntries := Array.append(userFileEntries, [(fileName, file)]);
+      };
+      stableFiles := Array.append(stableFiles, [(principal, userFileEntries)]);
+    };
+
+    // Convert transactions HashMap to stable storage
     stableTransactions := [];
     for ((principal, txs) in HashMap.entries(transactions)) {
       stableTransactions := Array.append(stableTransactions, [(principal, txs)]);
@@ -65,6 +84,16 @@ persistent actor Filevault {
   };
 
   system func postupgrade() {
+    // Restore files from stable storage
+    for ((principal, userFileEntries) in stableFiles.vals()) {
+      let userFiles = HashMap.new<Text, File>();
+      for ((fileName, file) in userFileEntries.vals()) {
+        ignore HashMap.put(userFiles, thash, fileName, file);
+      };
+      ignore HashMap.put(files, phash, principal, userFiles);
+    };
+    stableFiles := [];
+
     // Restore transactions from stable storage
     for ((principal, txs) in stableTransactions.vals()) {
       ignore HashMap.put(transactions, phash, principal, txs);
@@ -90,6 +119,15 @@ persistent actor Filevault {
 
   // Upload a file in chunks.
   public shared (msg) func uploadFileChunk(name : Text, chunk : Blob, index : Nat, fileType : Text) : async () {
+    // Validate input
+    if (Text.size(name) == 0) {
+      throw Error.reject("File name cannot be empty");
+    };
+    
+    if (chunk.size() == 0) {
+      throw Error.reject("Chunk cannot be empty");
+    };
+
     let userFiles = getUserFiles(msg.caller);
     let fileChunk = { chunk = chunk; index = index };
 
@@ -174,6 +212,21 @@ persistent actor Filevault {
 
   // Save transactions for a user
   public shared (msg) func saveTransactions(userTransactions : [Transaction]) : async () {
+    // Validate transactions
+    for (tx in userTransactions.vals()) {
+      if (Text.size(tx.id) == 0) {
+        throw Error.reject("Transaction ID cannot be empty");
+      };
+      
+      if (tx.amount < 0) {
+        throw Error.reject("Transaction amount cannot be negative");
+      };
+      
+      if (Text.size(tx.date) == 0) {
+        throw Error.reject("Transaction date cannot be empty");
+      };
+    };
+    
     let _ = HashMap.put(transactions, phash, msg.caller, userTransactions);
   };
 
@@ -186,4 +239,55 @@ persistent actor Filevault {
   public shared (msg) func deleteAllTransactions() : async () {
     let _ = HashMap.put(transactions, phash, msg.caller, []);
   };
+  
+  // Delete a specific transaction by ID
+  public shared (msg) func deleteTransaction(id : Text) : async Bool {
+    let userTxs = getUserTransactions(msg.caller);
+    let filteredTxs = Array.filter(userTxs, func(tx : Transaction) : Bool { tx.id != id });
+    
+    if (filteredTxs.size() == userTxs.size()) {
+      // No transaction was removed
+      return false;
+    };
+    
+    let _ = HashMap.put(transactions, phash, msg.caller, filteredTxs);
+    true;
+  };
+  
+  // Update a specific transaction
+  public shared (msg) func updateTransaction(updatedTx : Transaction) : async Bool {
+    let userTxs = getUserTransactions(msg.caller);
+    
+    // Validate transaction
+    if (Text.size(updatedTx.id) == 0) {
+      throw Error.reject("Transaction ID cannot be empty");
+    };
+    
+    if (updatedTx.amount < 0) {
+      throw Error.reject("Transaction amount cannot be negative");
+    };
+    
+    if (Text.size(updatedTx.date) == 0) {
+      throw Error.reject("Transaction date cannot be empty");
+    };
+    
+    // Find and update the transaction
+    let updatedTxs = Array.map(userTxs, func(tx : Transaction) : Transaction {
+      if (tx.id == updatedTx.id) {
+        updatedTx;
+      } else {
+        tx;
+      };
+    });
+    
+    // Check if any transaction was updated
+    let txFound = Array.find(userTxs, func(tx : Transaction) : Bool { tx.id == updatedTx.id });
+    if (Option.isNull(txFound)) {
+      return false;
+    };
+    
+    let _ = HashMap.put(transactions, phash, msg.caller, updatedTxs);
+    true;
+  };
 };
+

@@ -10,14 +10,56 @@ const Investment = ({ transactions }) => {
     if (transactions && transactions.length > 0) {
       setLoading(true);
       const fetchRecommendations = async () => {
-        const recommendationsFromAPI = await investmentRecommendationsFromAI(transactions);
-        setRecommendations(recommendationsFromAPI);
-        setLoading(false);
+        try {
+          console.log('Fetching investment recommendations with transactions:', transactions.length);
+          const recommendationsFromAPI = await investmentRecommendationsFromAI(transactions);
+          console.log('API Response:', recommendationsFromAPI);
+          
+          if (recommendationsFromAPI && Array.isArray(recommendationsFromAPI) && recommendationsFromAPI.length > 0) {
+            setRecommendations(recommendationsFromAPI);
+          } else {
+            console.error('Invalid API response format:', recommendationsFromAPI);
+            // Set default recommendations jika respons tidak valid
+            setDefaultRecommendations();
+          }
+        } catch (error) {
+          console.error('Error fetching investment recommendations:', error);
+          setDefaultRecommendations();
+        } finally {
+          setLoading(false);
+        }
       };
 
       fetchRecommendations();
+    } else {
+      // Set default recommendations jika tidak ada transaksi
+      setDefaultRecommendations();
     }
   }, [transactions]);
+
+  // Fungsi untuk set default recommendations
+  const setDefaultRecommendations = () => {
+    setRecommendations([
+      {
+        id: 1,
+        title: 'Diversify Portfolio',
+        description: 'Consider allocating assets across different investment categories to reduce risk.',
+        impact: 'High',
+        category: 'Diversification',
+        benefit: 'Reduced volatility and more stable returns',
+        instrumentType: 'etf'
+      },
+      {
+        id: 2,
+        title: 'Explore Growth Opportunities',
+        description: 'Research emerging markets or sectors with high growth potential.',
+        impact: 'Medium',
+        category: 'Growth Opportunities',
+        benefit: 'Potential for higher returns',
+        instrumentType: 'stock'
+      }
+    ]);
+  };
 
   const investmentRecommendationsFromAI = async (transactions) => {
     const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"

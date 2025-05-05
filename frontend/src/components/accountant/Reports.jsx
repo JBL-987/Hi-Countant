@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Download, Printer, Share2, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Download, Printer, Share2, Loader } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const Reports = ({ transactions }) => {
+  // Financial statements state
   const [financialStatements, setFinancialStatements] = useState([]);
   const [taxReports, setTaxReports] = useState([]);
   const [balanceSheet, setBalanceSheet] = useState({});
@@ -10,186 +13,145 @@ const Reports = ({ transactions }) => {
   const [quarterlyTaxSummary, setQuarterlyTaxSummary] = useState({});
   const [annualTaxReport, setAnnualTaxReport] = useState({});
   const [salesTaxReport, setSalesTaxReport] = useState({});
+
+  // UI state
   const [loading, setLoading] = useState(false);
+  const [logTrail, setLogTrail] = useState([]);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [showLogTrail, setShowLogTrail] = useState(false);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  
+  // Ref to track if reports have been generated
+  const reportsGeneratedRef = useRef(false);
+  
+  // Check localStorage for cached reports
+  useEffect(() => {
+    const cachedReports = localStorage.getItem('financialReports');
+    if (cachedReports) {
+      try {
+        const parsedReports = JSON.parse(cachedReports);
+        setBalanceSheet(parsedReports.balanceSheet || {});
+        setIncomeStatement(parsedReports.incomeStatement || {});
+        setCashFlowStatement(parsedReports.cashFlowStatement || {});
+        setQuarterlyTaxSummary(parsedReports.quarterlyTaxSummary || {});
+        setAnnualTaxReport(parsedReports.annualTaxReport || {});
+        setSalesTaxReport(parsedReports.salesTaxReport || {});
+        
+        setFinancialStatements([
+          parsedReports.balanceSheet,
+          parsedReports.incomeStatement,
+          parsedReports.cashFlowStatement,
+        ].filter(Boolean));
+        
+        setTaxReports([
+          parsedReports.quarterlyTaxSummary,
+          parsedReports.annualTaxReport,
+          parsedReports.salesTaxReport
+        ].filter(Boolean));
+        
+        reportsGeneratedRef.current = true;
+      } catch (error) {
+        console.error("Error parsing cached reports:", error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    if (transactions && transactions.length > 0) {
+    // Only generate reports if they haven't been generated yet and we have transactions
+    if (transactions && transactions.length > 0 && !reportsGeneratedRef.current) {
       const fetchFinancialData = async () => {
         setLoading(true);
-        const statements = await recommendationsFromAI(dummyData);
-        if (statements && statements.length === 6) {
-          const [ balanceData, incomeData, cashFlowData, quarterlyTaxData, annualTaxData, salesTaxData ] = statements;
-  
-          setBalanceSheet(balanceData?.balance_sheet || {});
-          setIncomeStatement(incomeData?.income_statement || {});
-          setCashFlowStatement(cashFlowData?.cash_flow_statement || {});
-          setQuarterlyTaxSummary(quarterlyTaxData?.quarterly_tax_summary || {});
-          setAnnualTaxReport(annualTaxData?.annual_tax_report || {});
-          setSalesTaxReport(salesTaxData?.sales_tax_report || {});
-  
-          setFinancialStatements([
-            balanceData?.balance_sheet,
-            incomeData?.income_statement,
-            cashFlowData?.cash_flow_statement,
-          ]);
-          setTaxReports([
-            quarterlyTaxData?.quarterly_tax_summary,
-            annualTaxData?.annual_tax_report,
-            salesTaxData?.sales_tax_report
-          ]);
+
+        // Add to log trail
+        const startTimestamp = new Date().toISOString();
+        const startLogEntry = {
+          id: `log-${Date.now()}`,
+          timestamp: startTimestamp,
+          action: 'Started Report Generation',
+          details: 'Analyzing financial data with Gemini AI',
+          status: 'pending'
+        };
+
+        setLogTrail(prev => [startLogEntry, ...prev]);
+
+        try {
+          const statements = await recommendationsFromAI(transactions);
+          if (statements && statements.length === 6) {
+            const [ balanceData, incomeData, cashFlowData, quarterlyTaxData, annualTaxData, salesTaxData ] = statements;
+
+            const balanceSheetData = balanceData?.balance_sheet || {};
+            const incomeStatementData = incomeData?.income_statement || {};
+            const cashFlowStatementData = cashFlowData?.cash_flow_statement || {};
+            const quarterlyTaxSummaryData = quarterlyTaxData?.quarterly_tax_summary || {};
+            const annualTaxReportData = annualTaxData?.annual_tax_report || {};
+            const salesTaxReportData = salesTaxData?.sales_tax_report || {};
+
+            setBalanceSheet(balanceSheetData);
+            setIncomeStatement(incomeStatementData);
+            setCashFlowStatement(cashFlowStatementData);
+            setQuarterlyTaxSummary(quarterlyTaxSummaryData);
+            setAnnualTaxReport(annualTaxReportData);
+            setSalesTaxReport(salesTaxReportData);
+
+            setFinancialStatements([
+              balanceSheetData,
+              incomeStatementData,
+              cashFlowStatementData,
+            ].filter(Boolean));
+
+            setTaxReports([
+              quarterlyTaxSummaryData,
+              annualTaxReportData,
+              salesTaxReportData
+            ].filter(Boolean));
+
+            // Mark reports as generated
+            reportsGeneratedRef.current = true;
+
+            // Cache the reports in localStorage
+            localStorage.setItem('financialReports', JSON.stringify({
+              balanceSheet: balanceSheetData,
+              incomeStatement: incomeStatementData,
+              cashFlowStatement: cashFlowStatementData,
+              quarterlyTaxSummary: quarterlyTaxSummaryData,
+              annualTaxReport: annualTaxReportData,
+              salesTaxReport: salesTaxReportData
+            }));
+
+            // Add to log trail
+            const timestamp = new Date().toISOString();
+            const newLogEntry = {
+              id: `log-${Date.now()}`,
+              timestamp,
+              action: 'Generated Reports',
+              details: 'Financial statements and tax reports generated successfully',
+              status: 'success'
+            };
+
+            setLogTrail(prev => [newLogEntry, ...prev.filter(entry => entry.id !== startLogEntry.id)]);
+            showNotification('Reports generated successfully!', 'success');
+          }
+        } catch (error) {
+          const timestamp = new Date().toISOString();
+          const newLogEntry = {
+            id: `log-${Date.now()}`,
+            timestamp,
+            action: 'Report Generation Failed',
+            details: error.message || 'Failed to generate reports',
+            status: 'error'
+          };
+
+          setLogTrail(prev => [newLogEntry, ...prev.filter(entry => entry.id !== startLogEntry.id)]);
+          showNotification('Failed to generate reports', 'error');
+        } finally {
           setLoading(false);
         }
       };
-  
+
       fetchFinancialData();
     }
   }, [transactions]);
 
-  const dummyData = {
-      "businessInfo": {
-        "name": "Hi-Countant",
-        "fiscalYear": 2024,
-        "reportingMonth": "May",
-        "industry": "Accountant Services"
-      },
-      "revenue": {
-        "sources": [
-          { "source": "Website Development", "amount": 4500.00 },
-          { "source": "App Maintenance", "amount": 1200.00 },
-          { "source": "Consulting", "amount": 800.00 }
-        ],
-        "total": 6500.00
-      },
-      "expenses": {
-        "categories": [
-          { "category": "Office Supplies", "amount": 125.50 },
-          { "category": "Salaries", "amount": 3000.00 },
-          { "category": "Utilities", "amount": 200.00 },
-          { "category": "Rent", "amount": 1200.00 },
-          { "category": "Internet & Phone", "amount": 100.00 },
-          { "category": "Travel", "amount": 250.00 }
-        ],
-        "total": 4875.50
-      },
-      "budget": {
-        "revenue": 7000.00,
-        "expenses": 5000.00
-      },
-      "balanceSheet": {
-        "assets": {
-          "cash": 2000.00,
-          "accountsReceivable": 1800.00,
-          "officeEquipment": 3000.00,
-          "inventory": 500.00,
-          "total": 7300.00
-        },
-        "liabilities": {
-          "accountsPayable": 800.00,
-          "businessLoan": 2000.00,
-          "total": 2800.00
-        },
-        "equity": {
-          "ownersEquity": 3500.00,
-          "retainedEarnings": 1000.00,
-          "total": 4500.00
-        }
-      },
-      "cashFlow": {
-        "operating": {
-          "cashFromSales": 6000.00,
-          "cashPaid": -4500.00,
-          "net": 1500.00
-        },
-        "investing": {
-          "equipmentPurchase": -500.00,
-          "net": -500.00
-        },
-        "financing": {
-          "loanReceived": 1000.00,
-          "loanRepayment": -250.00,
-          "net": 750.00
-        },
-        "netCashFlow": 1750.00
-      },
-      "taxes": {
-        "compliance": {
-          "incomeTaxLiability": 500.00,
-          "salesTaxCollected": 130.00,
-          "taxPaid": 400.00,
-          "filingDue": "2025-06-30",
-          "status": "Up-to-date"
-        },
-        "quarterlySummary": {
-          "Q2": {
-            "taxLiability": 600.00,
-            "taxPaid": 450.00
-          }
-        },
-        "annualReport": {
-          "liability": 1200.00,
-          "paid": 900.00,
-          "carryforward": 0.00
-        },
-        "salesTaxReport": {
-          "salesRevenue": 6500.00,
-          "salesTaxCollected": 130.00,
-          "salesTaxDue": 130.00
-        }
-      },
-      "reports": {
-        "financialRatios": {
-          "currentRatio": 2.61,
-          "profitMargin": 0.25,
-          "debtRatio": 0.38
-        },
-        "budgetComparison": {
-          "budgetedRevenue": 7000.00,
-          "actualRevenue": 6500.00,
-          "budgetedExpenses": 5000.00,
-          "actualExpenses": 4875.50,
-          "varianceRevenue": -500.00,
-          "varianceExpenses": -124.50
-        },
-        "expensesByCategory": [
-          {
-            "category": "Office Supplies",
-            "amount": 125.50,
-            "percentage": 2.57
-          },
-          {
-            "category": "Salaries",
-            "amount": 3000.00,
-            "percentage": 61.54
-          },
-          {
-            "category": "Utilities",
-            "amount": 200.00,
-            "percentage": 4.10
-          },
-          {
-            "category": "Rent",
-            "amount": 1200.00,
-            "percentage": 24.61
-          },
-          {
-            "category": "Internet & Phone",
-            "amount": 100.00,
-            "percentage": 2.05
-          },
-          {
-            "category": "Travel",
-            "amount": 250.00,
-            "percentage": 5.13
-          }
-        ],
-        "monthlyTrends": {
-          "month": "May",
-          "income": 6500.00,
-          "expenses": 4875.50,
-          "profit": 1624.50
-        }
-      }
-    }
 
   const recommendationsFromAI = async (transactions) => {
     const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"
@@ -221,9 +183,9 @@ const Reports = ({ transactions }) => {
         - relevant tax details
       8. Financial Ratios:
         - liquidity, profitability, etc.
-      
+
       Your task is to analyze this input and return an array of **six** structured JSON objects representing the following financial statements and reports:
-      
+
       1. **Balance Sheet**:
         Fields:
         - date: today's date (e.g., "2025-05-01")
@@ -241,7 +203,7 @@ const Reports = ({ transactions }) => {
           - owner_equity
           - retained_earnings
           - total_equity
-      
+
       2. **Income Statement**:
         Fields:
         - period: the reporting month in YYYY-MM format (e.g., "2025-04")
@@ -256,7 +218,7 @@ const Reports = ({ transactions }) => {
           - supplies
           - total_expenses
         - net_income: calculated as total revenue - total expenses
-      
+
       3. **Cash Flow Statement**:
         Fields:
         - period: the reporting month in YYYY-MM format
@@ -273,14 +235,14 @@ const Reports = ({ transactions }) => {
           - owner_draw
           - net_cash_from_financing
         - net_cash_flow: sum of operating + investing + financing
-      
+
       4. **Quarterly Tax Summary**:
         Fields:
         - quarter: e.g., "Q2"
         - tax_liability
         - tax_paid
         - tax_due: tax_liability - tax_paid
-      
+
       5. **Annual Tax Report**:
         Fields:
         - fiscal_year
@@ -288,23 +250,23 @@ const Reports = ({ transactions }) => {
         - total_tax_paid
         - carryforward_amount
         - tax_status
-      
+
       6. **Sales Tax Report**:
         Fields:
         - sales_revenue
         - sales_tax_collected
         - sales_tax_due
-      
+
       **Rules**:
       - Use fields from the input data and map them intelligently to the specified categories.
       - Rename keys where necessary to ensure standardization.
       - Ensure realistic approximations or conversions, such as converting "App Maintenance" and "Consulting" to "service_income".
       - Ensure values match the logic and numbers from the original input.
-      
+
       **EXTREMELY IMPORTANT**: Your response must ONLY contain the raw JSON array, starting with [ and ending with ]. Do not include any explanation, markdown formatting, or surrounding text. Just return the raw JSON array.
-      
+
       Example Output Format:
-      
+
       [
         {
           "balance_sheet": {
@@ -393,7 +355,7 @@ const Reports = ({ transactions }) => {
         }
       ]
     `;
-    
+
     // Call Gemini API
     try{
       const response = await fetch(
@@ -415,10 +377,10 @@ const Reports = ({ transactions }) => {
       const data = await response.json();
       const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawText) return [];
-      
+
       const cleanedText = rawText.replace(/```json\s*|```/g, "").trim();
 
-      console.log("Gemini response:", cleanedText); 
+      console.log("Gemini response:", cleanedText);
 
       try {
         return JSON.parse(cleanedText);
@@ -434,22 +396,511 @@ const Reports = ({ transactions }) => {
 
   // Format date
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('en-US', options);
   };
 
+  // Format currency
   const formatCurrency = (amount) => {
+    if (amount === undefined || amount === null) return "$0.00";
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
   };
 
+  // Format timestamp
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return "N/A";
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  // Show notification
+  const showNotification = (message, type) => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: '' });
+    }, 3000);
+  };
+
+  // Get report name from report object
+  const getReportName = (report) => {
+    if (report === balanceSheet) return 'Balance Sheet';
+    if (report === incomeStatement) return 'Income Statement';
+    if (report === cashFlowStatement) return 'Cash Flow Statement';
+    if (report === quarterlyTaxSummary) return 'Quarterly Tax Summary';
+    if (report === annualTaxReport) return 'Annual Tax Report';
+    if (report === salesTaxReport) return 'Sales Tax Report';
+    return 'Report';
+  };
+
+  // Handle view report
+  const handleViewReport = (report) => {
+    setSelectedReport(report);
+  };
+
+  // Download report as PDF
+  const handleDownloadReport = (report) => {
+    const doc = new jsPDF();
+    const reportName = getReportName(report);
+
+    // Add to log trail
+    const timestamp = new Date().toISOString();
+    const newLogEntry = {
+      id: `log-${Date.now()}`,
+      timestamp,
+      action: 'Downloaded Report',
+      details: `Downloaded ${reportName} as PDF`,
+      status: 'success'
+    };
+
+    setLogTrail(prev => [newLogEntry, ...prev]);
+    showNotification(`${reportName} downloaded successfully`, 'success');
+
+    // Generate PDF based on report type
+    doc.setFontSize(20);
+    doc.setTextColor(0, 51, 153);
+    doc.text("Hi! Countant", 105, 15, { align: "center" });
+
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(reportName, 105, 25, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 30, { align: "center" });
+
+    // Add report details based on type
+    if (report === balanceSheet) {
+      generateBalanceSheetPDF(doc);
+    } else if (report === incomeStatement) {
+      generateIncomeStatementPDF(doc);
+    } else if (report === cashFlowStatement) {
+      generateCashFlowPDF(doc);
+    } else if (report === quarterlyTaxSummary) {
+      generateQuarterlyTaxPDF(doc);
+    } else if (report === annualTaxReport) {
+      generateAnnualTaxPDF(doc);
+    } else if (report === salesTaxReport) {
+      generateSalesTaxPDF(doc);
+    }
+
+    // Add footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        "Generated by Hi! Countant - AI Accountant Platform",
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    // Save the PDF
+    doc.save(`${reportName.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  // Tambahkan fungsi untuk menghasilkan PDF komprehensif
+  const handleGenerateComprehensivePDF = () => {
+    const doc = new jsPDF();
+    
+    // Add title and header
+    doc.setFontSize(20);
+    doc.setTextColor(0, 51, 153);
+    doc.text("Hi! Countant - Financial Reports", 105, 15, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 30, {
+      align: "center",
+    });
+
+    // Basic transaction info
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, 35, 182, 10, "F");
+    doc.setFont(undefined, "bold");
+    doc.text("Financial Statements", 15, 42);
+    doc.setFont(undefined, "normal");
+    
+    let finalY = 46;
+    
+    // Financial Statements Section
+    if (financialStatements.length > 0) {
+      // Balance Sheet
+      if (balanceSheet && Object.keys(balanceSheet).length > 0) {
+        const balanceSheetData = [
+          ["Balance Sheet", ""],
+          ["Date", balanceSheet.date || new Date().toISOString().split('T')[0]],
+          ["", ""],
+          ["Assets", ""],
+        ];
+        
+        // Add assets
+        Object.entries(balanceSheet.assets || {}).forEach(([key, value]) => {
+          if (key !== 'total_assets') {
+            balanceSheetData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        balanceSheetData.push(["Total Assets", formatCurrency(balanceSheet.assets?.total_assets || 0)]);
+        
+        balanceSheetData.push(["", ""]);
+        balanceSheetData.push(["Liabilities", ""]);
+        
+        // Add liabilities
+        Object.entries(balanceSheet.liabilities || {}).forEach(([key, value]) => {
+          if (key !== 'total_liabilities') {
+            balanceSheetData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        balanceSheetData.push(["Total Liabilities", formatCurrency(balanceSheet.liabilities?.total_liabilities || 0)]);
+        
+        balanceSheetData.push(["", ""]);
+        balanceSheetData.push(["Equity", ""]);
+        
+        // Add equity
+        Object.entries(balanceSheet.equity || {}).forEach(([key, value]) => {
+          if (key !== 'total_equity') {
+            balanceSheetData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        balanceSheetData.push(["Total Equity", formatCurrency(balanceSheet.equity?.total_equity || 0)]);
+        
+        // Use autoTable with the doc as first parameter
+        autoTable(doc, {
+          startY: finalY,
+          head: [],
+          body: balanceSheetData,
+          theme: "grid",
+          styles: { fontSize: 10 },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 120 },
+            1: { cellWidth: 'auto', halign: 'right' },
+          },
+          margin: { left: 15, right: 15 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+          alternateRowStyles: { fillColor: [248, 248, 248] },
+        });
+      }
+      
+      // Get the final Y position from the previous table
+      finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 100;
+      
+      // Check if we need a new page
+      if (finalY > 250) {
+        doc.addPage();
+        finalY = 20;
+      }
+      
+      // Income Statement
+      if (incomeStatement && Object.keys(incomeStatement).length > 0) {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(14, finalY, 182, 10, "F");
+        doc.setFont(undefined, "bold");
+        doc.text("Income Statement", 15, finalY + 7);
+        doc.setFont(undefined, "normal");
+        
+        const incomeStatementData = [
+          ["Period", incomeStatement.period || new Date().toISOString().split('T')[0].substring(0, 7)],
+          ["", ""],
+          ["Revenue", ""],
+        ];
+        
+        // Add revenue
+        Object.entries(incomeStatement.revenue || {}).forEach(([key, value]) => {
+          if (key !== 'total_revenue') {
+            incomeStatementData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        incomeStatementData.push(["Total Revenue", formatCurrency(incomeStatement.revenue?.total_revenue || 0)]);
+        
+        incomeStatementData.push(["", ""]);
+        incomeStatementData.push(["Expenses", ""]);
+        
+        // Add expenses
+        Object.entries(incomeStatement.expenses || {}).forEach(([key, value]) => {
+          if (key !== 'total_expenses') {
+            incomeStatementData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        incomeStatementData.push(["Total Expenses", formatCurrency(incomeStatement.expenses?.total_expenses || 0)]);
+        
+        incomeStatementData.push(["", ""]);
+        incomeStatementData.push(["Net Income", formatCurrency(incomeStatement.net_income || 0)]);
+        
+        // Use autoTable with the doc as first parameter
+        autoTable(doc, {
+          startY: finalY + 12,
+          head: [],
+          body: incomeStatementData,
+          theme: "grid",
+          styles: { fontSize: 10 },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 120 },
+            1: { cellWidth: 'auto', halign: 'right' },
+          },
+          margin: { left: 15, right: 15 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+          alternateRowStyles: { fillColor: [248, 248, 248] },
+        });
+      }
+      
+      // Get the final Y position from the previous table
+      finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : finalY + 100;
+      
+      // Check if we need a new page
+      if (finalY > 250) {
+        doc.addPage();
+        finalY = 20;
+      }
+      
+      // Cash Flow Statement
+      if (cashFlowStatement && Object.keys(cashFlowStatement).length > 0) {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(14, finalY, 182, 10, "F");
+        doc.setFont(undefined, "bold");
+        doc.text("Cash Flow Statement", 15, finalY + 7);
+        doc.setFont(undefined, "normal");
+        
+        const cashFlowData = [
+          ["Period", cashFlowStatement.period || new Date().toISOString().split('T')[0].substring(0, 7)],
+          ["", ""],
+          ["Operating Activities", ""],
+        ];
+        
+        // Add operating activities
+        Object.entries(cashFlowStatement.operating_activities || {}).forEach(([key, value]) => {
+          if (key !== 'net_cash_from_operating') {
+            cashFlowData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        cashFlowData.push(["Net Cash from Operating", formatCurrency(cashFlowStatement.operating_activities?.net_cash_from_operating || 0)]);
+        
+        cashFlowData.push(["", ""]);
+        cashFlowData.push(["Investing Activities", ""]);
+        
+        // Add investing activities
+        Object.entries(cashFlowStatement.investing_activities || {}).forEach(([key, value]) => {
+          if (key !== 'net_cash_from_investing') {
+            cashFlowData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        cashFlowData.push(["Net Cash from Investing", formatCurrency(cashFlowStatement.investing_activities?.net_cash_from_investing || 0)]);
+        
+        cashFlowData.push(["", ""]);
+        cashFlowData.push(["Financing Activities", ""]);
+        
+        // Add financing activities
+        Object.entries(cashFlowStatement.financing_activities || {}).forEach(([key, value]) => {
+          if (key !== 'net_cash_from_financing') {
+            cashFlowData.push([`  ${formatLabel(key)}`, formatCurrency(value)]);
+          }
+        });
+        cashFlowData.push(["Net Cash from Financing", formatCurrency(cashFlowStatement.financing_activities?.net_cash_from_financing || 0)]);
+        
+        cashFlowData.push(["", ""]);
+        cashFlowData.push(["Net Cash Flow", formatCurrency(cashFlowStatement.net_cash_flow || 0)]);
+        
+        // Use autoTable with the doc as first parameter
+        autoTable(doc, {
+          startY: finalY + 12,
+          head: [],
+          body: cashFlowData,
+          theme: "grid",
+          styles: { fontSize: 10 },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 120 },
+            1: { cellWidth: 'auto', halign: 'right' },
+          },
+          margin: { left: 15, right: 15 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+          alternateRowStyles: { fillColor: [248, 248, 248] },
+        });
+      }
+    }
+    
+    // Add a new page for Tax Reports
+    doc.addPage();
+    
+    // Tax Reports Section
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, 15, 182, 10, "F");
+    doc.setFont(undefined, "bold");
+    doc.text("Tax & Compliance Reports", 15, 22);
+    doc.setFont(undefined, "normal");
+    
+    finalY = 30;
+    
+    if (taxReports.length > 0) {
+      // Quarterly Tax Summary
+      if (quarterlyTaxSummary && Object.keys(quarterlyTaxSummary).length > 0) {
+        const quarterlyData = [
+          ["Quarterly Tax Summary", ""],
+          ["Quarter", quarterlyTaxSummary.quarter || "Current"],
+          ["Tax Liability", formatCurrency(quarterlyTaxSummary.tax_liability || 0)],
+          ["Tax Paid", formatCurrency(quarterlyTaxSummary.tax_paid || 0)],
+          ["Tax Due", formatCurrency(quarterlyTaxSummary.tax_due || 0)],
+        ];
+        
+        // Use autoTable with the doc as first parameter
+        autoTable(doc, {
+          startY: finalY,
+          head: [],
+          body: quarterlyData,
+          theme: "grid",
+          styles: { fontSize: 10 },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 120 },
+            1: { cellWidth: 'auto', halign: 'right' },
+          },
+          margin: { left: 15, right: 15 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+          alternateRowStyles: { fillColor: [248, 248, 248] },
+        });
+      }
+      
+      // Get the final Y position from the previous table
+      finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : finalY + 100;
+      
+      // Check if we need a new page
+      if (finalY > 250) {
+        doc.addPage();
+        finalY = 20;
+      }
+      
+      // Annual Tax Report
+      if (annualTaxReport && Object.keys(annualTaxReport).length > 0) {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(14, finalY, 182, 10, "F");
+        doc.setFont(undefined, "bold");
+        doc.text("Annual Tax Report", 15, finalY + 7);
+        doc.setFont(undefined, "normal");
+        
+        const annualData = [
+          ["Fiscal Year", annualTaxReport.fiscal_year || new Date().getFullYear()],
+          ["Total Tax Liability", formatCurrency(annualTaxReport.total_tax_liability || 0)],
+          ["Total Tax Paid", formatCurrency(annualTaxReport.total_tax_paid || 0)],
+          ["Carryforward Amount", formatCurrency(annualTaxReport.carryforward_amount || 0)],
+        ];
+        
+        // Use autoTable with the doc as first parameter
+        autoTable(doc, {
+          startY: finalY + 12,
+          head: [],
+          body: annualData,
+          theme: "grid",
+          styles: { fontSize: 10 },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 120 },
+            1: { cellWidth: 'auto', halign: 'right' },
+          },
+          margin: { left: 15, right: 15 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+          alternateRowStyles: { fillColor: [248, 248, 248] },
+        });
+      }
+      
+      // Get the final Y position from the previous table
+      finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : finalY + 100;
+      
+      // Check if we need a new page
+      if (finalY > 250) {
+        doc.addPage();
+        finalY = 20;
+      }
+      
+      // Sales Tax Report
+      if (salesTaxReport && Object.keys(salesTaxReport).length > 0) {
+        doc.setFillColor(240, 240, 240);
+        doc.rect(14, finalY, 182, 10, "F");
+        doc.setFont(undefined, "bold");
+        doc.text("Sales Tax Report", 15, finalY + 7);
+        doc.setFont(undefined, "normal");
+        
+        const salesTaxData = [
+          ["Sales Revenue", formatCurrency(salesTaxReport.sales_revenue || 0)],
+          ["Sales Tax Collected", formatCurrency(salesTaxReport.sales_tax_collected || 0)],
+          ["Sales Tax Due", formatCurrency(salesTaxReport.sales_tax_due || 0)],
+        ];
+        
+        // Use autoTable with the doc as first parameter
+        autoTable(doc, {
+          startY: finalY + 12,
+          head: [],
+          body: salesTaxData,
+          theme: "grid",
+          styles: { fontSize: 10 },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 120 },
+            1: { cellWidth: 'auto', halign: 'right' },
+          },
+          margin: { left: 15, right: 15 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+          alternateRowStyles: { fillColor: [248, 248, 248] },
+        });
+      }
+    }
+    
+    // Add footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        "Generated by Hi! Countant - AI Accountant Platform",
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+    
+    // Save the PDF
+    doc.save("Hi_Countant_Financial_Reports.pdf");
+    
+    // Add to log trail
+    const timestamp = new Date().toISOString();
+    const newLogEntry = {
+      id: `log-${Date.now()}`,
+      timestamp,
+      action: 'Downloaded Comprehensive Report',
+      details: 'All financial statements and tax reports downloaded as PDF',
+      status: 'success'
+    };
+    
+    setLogTrail(prev => [newLogEntry, ...prev]);
+    showNotification('Comprehensive report downloaded successfully', 'success');
+  };
+
+  // Fungsi helper untuk kapitalisasi
+  function capitalizeFirstLetter(string) {
+    if (!string) return "";
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-white">Reports</h1>
         <div className="flex items-center space-x-2">
+          <button 
+            onClick={handleGenerateComprehensivePDF}
+            className="flex items-center space-x-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm"
+          >
+            <Download size={16} />
+            <span>Download All Reports</span>
+          </button>
           <span className="text-sm text-gray-400">Last generated: {new Date().toLocaleDateString()}</span>
         </div>
       </div>
@@ -511,7 +962,7 @@ const Reports = ({ transactions }) => {
               <tbody>
                 <tr><td colSpan={7}>
                   <div className="flex flex-col items-center justify-center h-32">
-                    <Loader2 className="animate-spin text-white h-6 w-6 mb-2" />
+                    <Loader className="animate-spin text-white h-6 w-6 mb-2" />
                     <span className="text-white text-sm">Analyzing with Gemini AI...</span>
                   </div>
                 </td></tr>
@@ -644,7 +1095,7 @@ const Reports = ({ transactions }) => {
                 <tbody>
                   <tr><td colSpan={7}>
                     <div className="flex flex-col items-center justify-center h-32">
-                      <Loader2 className="animate-spin text-white h-6 w-6 mb-2" />
+                      <Loader className="animate-spin text-white h-6 w-6 mb-2" />
                       <span className="text-white text-sm">Analyzing with Gemini AI...</span>
                     </div>
                   </td></tr>
@@ -671,7 +1122,10 @@ const Reports = ({ transactions }) => {
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
                     <div className="flex justify-end space-x-2">
-                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                      <button 
+                        onClick={() => handleDownloadReport(quarterlyTaxSummary)}
+                        className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white"
+                      >
                         <Download size={16} />
                       </button>
                       <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
@@ -684,7 +1138,7 @@ const Reports = ({ transactions }) => {
                   </td>
                 </tr>
               )}
-              
+
               {annualTaxReport && annualTaxReport.fiscal_year && (
                 <tr>
                   <td className="px-4 py-3 text-sm text-gray-300">Annual Tax Report</td>
@@ -705,7 +1159,10 @@ const Reports = ({ transactions }) => {
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
                     <div className="flex justify-end space-x-2">
-                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                      <button 
+                        onClick={() => handleDownloadReport(annualTaxReport)}
+                        className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white"
+                      >
                         <Download size={16} />
                       </button>
                       <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
@@ -718,7 +1175,7 @@ const Reports = ({ transactions }) => {
                   </td>
                 </tr>
               )}
-              
+
               {salesTaxReport && (
                 <tr>
                   <td className="px-4 py-3 text-sm text-gray-300">Sales Tax Report</td>
@@ -739,7 +1196,10 @@ const Reports = ({ transactions }) => {
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
                     <div className="flex justify-end space-x-2">
-                      <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">
+                      <button 
+                        onClick={() => handleDownloadReport(salesTaxReport)}
+                        className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white"
+                      >
                         <Download size={16} />
                       </button>
                       <button className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white">

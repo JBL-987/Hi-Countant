@@ -10,14 +10,54 @@ const Recommendations = ({ transactions }) => {
     if (transactions && transactions.length > 0) {
       setLoading(true);
       const fetchRecommendations = async () => {
-        const recommendationsFromAPI = await recommendationsFromAI(transactions);
-        setRecommendations(recommendationsFromAPI);
-        setLoading(false);
+        try {
+          console.log('Fetching recommendations with transactions:', transactions.length);
+          const recommendationsFromAPI = await recommendationsFromAI(transactions);
+          console.log('API Response:', recommendationsFromAPI);
+          
+          if (recommendationsFromAPI && Array.isArray(recommendationsFromAPI) && recommendationsFromAPI.length > 0) {
+            setRecommendations(recommendationsFromAPI);
+          } else {
+            console.error('Invalid API response format:', recommendationsFromAPI);
+            // Set default recommendations jika respons tidak valid
+            setDefaultRecommendations();
+          }
+        } catch (error) {
+          console.error('Error fetching recommendations:', error);
+          setDefaultRecommendations();
+        } finally {
+          setLoading(false);
+        }
       };
 
       fetchRecommendations();
+    } else {
+      // Set default recommendations jika tidak ada transaksi
+      setDefaultRecommendations();
     }
   }, [transactions]);
+
+  // Fungsi untuk set default recommendations
+  const setDefaultRecommendations = () => {
+    setRecommendations([
+      {
+        id: 1,
+        title: 'Improve Cash Flow Management',
+        description: 'Set up a system to track and forecast cash flow on a weekly basis.',
+        impact: 'High',
+        category: 'Process Improvement',
+        benefit: 'Better financial visibility and planning'
+      },
+      {
+        id: 2,
+        title: 'Reduce Operational Expenses',
+        description: 'Review and optimize recurring expenses such as subscriptions and utilities.',
+        impact: 'Medium',
+        category: 'Cost Reduction',
+        benefit: 'Potential 10-15% savings on operational costs'
+      }
+    ]);
+  };
 
   const recommendationsFromAI = async (transactions) => {
     const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"

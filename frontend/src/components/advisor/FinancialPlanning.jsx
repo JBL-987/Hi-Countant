@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { getTransactionsForDocument } from '../../utils/documentUtils';
 
 const FinancialPlanning = ({ transactions }) => {
   const [financialGoals, setFinancialGoals] = useState([
@@ -104,73 +105,115 @@ const FinancialPlanning = ({ transactions }) => {
   };
 
   const analyzeFinancialPlan = async (transactions) => {
-    const logTrailsTransactions = await getTransactionsForDocument();
-    const combinedTransactions = [...transactions, ...logTrailsTransactions];
+    try {
+      console.log("Analyzing financial plan with transactions:", transactions.length);
+      const logTrailsTransactions = await getTransactionsForDocument();
 
-    const totalIncome = combinedTransactions
-    .filter(t => t.transactionType === 'income')
-    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+      console.log("Log trails transactions:", logTrailsTransactions.length);
+      const combinedTransactions = [...transactions, ...logTrailsTransactions];
+      
+      console.log("Combined transactions:", combinedTransactions.length);
+      const totalIncome = combinedTransactions
+        .filter(t => t.transactionType === 'income')
+        .reduce((sum, t) => {
+          const amount = parseFloat(t.amount || 0);
+          console.log(`Income transaction: ${t.description}, amount: ${amount}`);
+          return sum + amount;
+        }, 0);
+      console.log("Total income calculated:", totalIncome);
 
-    const totalExpenses = combinedTransactions
-    .filter(t => t.transactionType === 'expense')
-    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+      // Perbaiki perhitungan expenses
+      const totalExpenses = combinedTransactions
+        .filter(t => t.transactionType === 'expense')
+        .reduce((sum, t) => {
+          const amount = parseFloat(t.amount || 0);
+          console.log(`Expense transaction: ${t.description}, amount: ${amount}`);
+          return sum + amount;
+        }, 0);
+      console.log("Total expenses calculated:", totalExpenses);
 
-    const totalAssets = combinedTransactions
-    .filter(t => t.category === 'asset')
-    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+      // Perbaiki perhitungan assets
+      const totalAssets = combinedTransactions
+        .filter(t => t.category === 'asset' || t.transactionType === 'income')
+        .reduce((sum, t) => {
+          const amount = parseFloat(t.amount || 0);
+          console.log(`Asset transaction: ${t.description}, amount: ${amount}`);
+          return sum + amount;
+        }, 0);
+      console.log("Total assets calculated:", totalAssets);
 
-    const totalLiabilities = combinedTransactions
-    .filter(t => t.category === 'liability' || t.category === 'debt')
-    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+      // Perbaiki perhitungan liabilities
+      const totalLiabilities = combinedTransactions
+        .filter(t => t.category === 'liability' || t.category === 'debt')
+        .reduce((sum, t) => {
+          const amount = parseFloat(t.amount || 0);
+          console.log(`Liability transaction: ${t.description}, amount: ${amount}`);
+          return sum + amount;
+        }, 0);
+      console.log("Total liabilities calculated:", totalLiabilities);
 
-    const calculatedNetWorth = totalAssets - totalLiabilities;
-    setNetWorth(calculatedNetWorth);
-    
-    const monthlyExpenses = totalExpenses / 12;
-    const emergencyFundMonths = totalAssets > 0 ? 
-      Math.floor((totalAssets / monthlyExpenses) * 100) / 100 : 0;
+      // Perbaiki perhitungan net worth
+      const calculatedNetWorth = totalAssets - totalLiabilities;
+      console.log("Calculated net worth:", calculatedNetWorth);
+      setNetWorth(calculatedNetWorth);
+      
+      // Perbaiki perhitungan emergency fund
+      const monthlyExpenses = totalExpenses > 0 ? totalExpenses / 12 : 1; // Hindari pembagian dengan nol
+      const emergencyFundMonths = monthlyExpenses > 0 ? 
+        Math.floor((totalAssets / monthlyExpenses) * 100) / 100 : 0;
+      console.log("Emergency fund months:", emergencyFundMonths);
 
-    setEmergencyFund({
-      monthsCovered: emergencyFundMonths,
-      recommended: 6,
-      status: emergencyFundMonths >= 6 ? 'healthy' : emergencyFundMonths >= 3 ? 'moderate' : 'low'
-    });
+      setEmergencyFund({
+        monthsCovered: emergencyFundMonths,
+        recommended: 6,
+        status: emergencyFundMonths >= 6 ? 'healthy' : emergencyFundMonths >= 3 ? 'moderate' : 'low'
+      });
 
-    setCashFlow({
-      income: totalIncome,
-      expenses: totalExpenses,
-      savings: totalIncome - totalExpenses,
-      savingsRate: totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0
-    });
+      // Perbaiki perhitungan cash flow
+      const savingsRate = totalIncome > 0 ? 
+        ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0;
+      console.log("Savings rate:", savingsRate);
+      
+      setCashFlow({
+        income: totalIncome,
+        expenses: totalExpenses,
+        savings: totalIncome - totalExpenses,
+        savingsRate: savingsRate
+      });
 
-    setFinancialGoals([
-      {
-        name: 'Emergency Fund',
-        current: emergencyFundMonths,
-        target: 6,
-        unit: 'months',
-        progress: Math.min((emergencyFundMonths / 6) * 100, 100),
-        status: emergencyFundMonths >= 6 ? 'achieved' : 'in-progress'
-      },
-      {
-        name: 'Savings Rate',
-        current: parseFloat(((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1)) || 0,
-        target: 20,
-        unit: '%',
-        progress: Math.min((((totalIncome - totalExpenses) / totalIncome * 100) / 20) * 100, 100),
-        status: ((totalIncome - totalExpenses) / totalIncome * 100) >= 20 ? 'achieved' : 'in-progress'
-      },
-      {
-        name: 'Debt Reduction',
-        current: totalLiabilities,
-        target: totalLiabilities * 0.5,
-        unit: 'currency',
-        progress: totalLiabilities > 0 ? 
-          Math.max(0, 100 - (totalLiabilities / (totalLiabilities * 0.5) * 100)) : 
-          100,
-        status: totalLiabilities <= 0 ? 'achieved' : 'in-progress'
-      }
-    ]);
+      // Perbaiki perhitungan financial goals
+      setFinancialGoals([
+        {
+          name: 'Emergency Fund',
+          current: emergencyFundMonths,
+          target: 6,
+          unit: 'months',
+          progress: Math.min((emergencyFundMonths / 6) * 100, 100),
+          status: emergencyFundMonths >= 6 ? 'achieved' : 'in-progress'
+        },
+        {
+          name: 'Savings Rate',
+          current: parseFloat(savingsRate) || 0,
+          target: 20,
+          unit: '%',
+          progress: Math.min((parseFloat(savingsRate) / 20) * 100, 100),
+          status: parseFloat(savingsRate) >= 20 ? 'achieved' : 'in-progress'
+        },
+        {
+          name: 'Debt Reduction',
+          current: totalLiabilities,
+          target: totalLiabilities > 0 ? totalLiabilities * 0.5 : 1, // Hindari target nol
+          unit: 'currency',
+          progress: totalLiabilities > 0 ? 
+            Math.max(0, Math.min(100, 100 - (totalLiabilities / (totalLiabilities * 0.5) * 100))) : 
+            100,
+          status: totalLiabilities <= 0 ? 'achieved' : 'in-progress'
+        }
+      ]);
+    } catch (error) {
+      console.error("Error in analyzeFinancialPlan:", error);
+      setError(`Failed to analyze financial plan: ${error.message}`);
+    }
   };
 
   const formatCurrency = (amount) => {
