@@ -312,19 +312,19 @@ GEMINI_API_KEY=<your-api-key>  # For AI functionality
 ### Homepage Screenshots
 <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
   <div style="text-align: center;">
-    <img src="frontend/assets/homepage1.jpg" alt="Homepage View 1" width="500"/>
+    <img src="frontend/assets/homepage1.jpg" alt="Homepage View 1" width="700"/>
     <p>Homepage View 1</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/homepage2.jpg" alt="Homepage View 2" width="500"/>
+    <img src="frontend/assets/homepage2.jpg" alt="Homepage View 2" width="700"/>
     <p>Homepage View 2</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/homepage3.jpg" alt="Homepage View 3" width="500"/>
+    <img src="frontend/assets/homepage3.jpg" alt="Homepage View 3" width="700"/>
     <p>Homepage View 3</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/homepage4.jpg" alt="Homepage View 4" width="500"/>
+    <img src="frontend/assets/homepage4.jpg" alt="Homepage View 4" width="700"/>
     <p>Homepage View 4</p>
   </div>
 </div>
@@ -332,23 +332,23 @@ GEMINI_API_KEY=<your-api-key>  # For AI functionality
 ### Financial Advisor Features
 <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
   <div style="text-align: center;">
-    <img src="frontend/assets/advisor_financial_planning.jpg" alt="Financial Planning" width="500"/>
+    <img src="frontend/assets/advisor_financial_planning.jpg" alt="Financial Planning" width="700"/>
     <p>Financial Planning</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/advisor_investment.jpg" alt="Investment Advice" width="500"/>
+    <img src="frontend/assets/advisor_investment.jpg" alt="Investment Advice" width="700"/>
     <p>Investment Advice</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/advisor_investment2.jpg" alt="Investment Strategies" width="500"/>
+    <img src="frontend/assets/advisor_investment2.jpg" alt="Investment Strategies" width="700"/>
     <p>Investment Strategies</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/advisor_tax_strategy.jpg" alt="Tax Strategy" width="500"/>
+    <img src="frontend/assets/advisor_tax_strategy.jpg" alt="Tax Strategy" width="700"/>
     <p>Tax Strategy</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/advisor_tax_strategy2.jpg" alt="Advanced Tax Planning" width="500"/>
+    <img src="frontend/assets/advisor_tax_strategy2.jpg" alt="Advanced Tax Planning" width="700"/>
     <p>Advanced Tax Planning</p>
   </div>
 </div>
@@ -356,15 +356,15 @@ GEMINI_API_KEY=<your-api-key>  # For AI functionality
 ### Document Processing
 <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
   <div style="text-align: center;">
-    <img src="frontend/assets/process_document_loading.jpg" alt="Document Loading" width="500"/>
+    <img src="frontend/assets/process_document_loading.jpg" alt="Document Loading" width="700"/>
     <p>Document Loading</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/process_document.jpg" alt="Document Processing" width="500"/>
+    <img src="frontend/assets/process_document.jpg" alt="Document Processing" width="700"/>
     <p>Document Processing</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/validation.jpg" alt="Document Validation" width="500"/>
+    <img src="frontend/assets/validation.jpg" alt="Document Validation" width="700"/>
     <p>Document Validation</p>
   </div>
 </div>
@@ -372,19 +372,19 @@ GEMINI_API_KEY=<your-api-key>  # For AI functionality
 ### Data Management
 <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
   <div style="text-align: center;">
-    <img src="frontend/assets/data_input.jpg" alt="Data Input" width="500"/>
+    <img src="frontend/assets/data_input.jpg" alt="Data Input" width="700"/>
     <p>Data Input</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/data_input2.jpg" alt="Advanced Data Input" width="500"/>
+    <img src="frontend/assets/data_input2.jpg" alt="Advanced Data Input" width="700"/>
     <p>Advanced Data Input</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/generate_fake_transactions.jpg" alt="Transaction Generator" width="500"/>
+    <img src="frontend/assets/generate_fake_transactions.jpg" alt="Transaction Generator" width="700"/>
     <p>Transaction Generator</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/log_trails.jpg" alt="Log Trails" width="500"/>
+    <img src="frontend/assets/log_trails.jpg" alt="Log Trails" width="700"/>
     <p>Log Trails</p>
   </div>
 </div>
@@ -392,23 +392,23 @@ GEMINI_API_KEY=<your-api-key>  # For AI functionality
 ### Analysis & Reporting
 <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
   <div style="text-align: center;">
-    <img src="frontend/assets/analysis.jpg" alt="Financial Analysis" width="500"/>
+    <img src="frontend/assets/analysis.jpg" alt="Financial Analysis" width="700"/>
     <p>Financial Analysis</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/financial_report.jpg" alt="Financial Report" width="500"/>
+    <img src="frontend/assets/financial_report.jpg" alt="Financial Report" width="700"/>
     <p>Financial Report</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/report.jpg" alt="Standard Report" width="500"/>
+    <img src="frontend/assets/report.jpg" alt="Standard Report" width="700"/>
     <p>Standard Report</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/report_pdf.jpg" alt="PDF Report" width="500"/>
+    <img src="frontend/assets/report_pdf.jpg" alt="PDF Report" width="700"/>
     <p>PDF Report</p>
   </div>
   <div style="text-align: center;">
-    <img src="frontend/assets/recommendations.jpg" alt="AI Recommendations" width="500"/>
+    <img src="frontend/assets/recommendations.jpg" alt="AI Recommendations" width="700"/>
     <p>AI Recommendations</p>
   </div>
 </div>
@@ -416,7 +416,7 @@ GEMINI_API_KEY=<your-api-key>  # For AI functionality
 ### Workspace
 <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
   <div style="text-align: center;">
-    <img src="frontend/assets/workspace.jpg" alt="User Workspace" width="500"/>
+    <img src="frontend/assets/workspace.jpg" alt="User Workspace" width="700"/>
     <p>User Workspace</p>
   </div>
 </div>
