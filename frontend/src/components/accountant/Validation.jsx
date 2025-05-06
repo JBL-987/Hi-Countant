@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import DocumentComparison from "./DocumentComparison";
+import SimpleValidationAnimation from "./SimpleValidationAnimation";
 import {
   getDocumentPosition,
   hasDocumentPosition,
@@ -33,6 +34,8 @@ const Validation = ({
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [verifiedTransactions, setVerifiedTransactions] = useState({});
   const [flaggedTransactions, setFlaggedTransactions] = useState({});
+  const [isValidating, setIsValidating] = useState(false);
+  const [currentValidationItem, setCurrentValidationItem] = useState(null);
 
   // Function to check processed files
   const checkProcessedFiles = () => {
@@ -289,6 +292,9 @@ const Validation = ({
 
   // Start the validation process
   const startValidationProcess = () => {
+    // Only start if not already validating
+    if (isValidating) return;
+
     // Show a confirmation dialog
     Swal.fire({
       title: "Start Validation Process?",
@@ -300,117 +306,131 @@ const Validation = ({
       confirmButtonText: "Yes, start validation",
     }).then((result) => {
       if (result.isConfirmed) {
-        // Show a loading dialog
-        Swal.fire({
-          title: "Validating Transactions...",
-          html: `
-            <div class="text-center">
-              <div class="mb-3">Validating ${transactions.length} transactions</div>
-              <div class="progress-bar-container" style="height: 10px; background-color: #333; border-radius: 5px; overflow: hidden;">
-                <div id="validation-progress-bar" style="height: 100%; width: 0%; background-color: #3b82f6; transition: width 0.3s;"></div>
-              </div>
-              <div id="validation-progress-text" class="mt-2">Starting validation...</div>
-            </div>
-          `,
-          allowOutsideClick: false,
-          showConfirmButton: false,
-          didOpen: () => {
-            const progressBar = document.getElementById(
-              "validation-progress-bar"
-            );
-            const progressText = document.getElementById(
-              "validation-progress-text"
-            );
+        // Get transactions that need validation
+        const transactionsToValidate = transactions.filter(
+          (t) =>
+            t.sourceFile &&
+            !verifiedTransactions[t.id] &&
+            !flaggedTransactions[t.id]
+        );
 
-            // Start with animation to show it's working
-            progressBar.style.width = "5%";
-            progressText.textContent = "Preparing to validate...";
-          },
+        if (transactionsToValidate.length === 0) {
+          Swal.fire({
+            title: "No Transactions to Validate",
+            text: "All transactions have already been verified or don't have source documents.",
+            icon: "info",
+          });
+          return;
+        }
+
+        // Set validation state
+        setIsValidating(true);
+
+        // Initialize validation stats
+        const stats = {
+          total: transactionsToValidate.length,
+          valid: 0,
+          warning: 0,
+          error: 0,
+        };
+
+        // Process all transactions first to calculate stats
+        transactionsToValidate.forEach((transaction) => {
+          // Find the source document
+          const sourceDocument = files.find(
+            (file) => file.name === transaction.sourceFile
+          );
+
+          // Determine validation status
+          if (!sourceDocument) {
+            stats.error++;
+          } else {
+            // Perform validation checks
+            const validationResult = validateTransaction(transaction);
+            if (validationResult.status === "warning") {
+              stats.warning++;
+            } else if (validationResult.status === "error") {
+              stats.error++;
+            } else {
+              stats.valid++;
+            }
+          }
         });
 
-        // Simulate validation process with progress updates
-        setTimeout(async () => {
-          const progressBar = document.getElementById(
-            "validation-progress-bar"
-          );
-          const progressText = document.getElementById(
-            "validation-progress-text"
-          );
-
-          // Get transactions that need validation
-          const transactionsToValidate = transactions.filter(
-            (t) =>
-              t.sourceFile &&
-              !verifiedTransactions[t.id] &&
-              !flaggedTransactions[t.id]
-          );
-
-          const totalToValidate = transactionsToValidate.length;
-          let validatedCount = 0;
-          let sourceMissingCount = 0;
-          let validCount = 0;
-          let warningCount = 0;
-
-          // Process transactions in batches
-          for (let i = 0; i < transactionsToValidate.length; i++) {
-            const transaction = transactionsToValidate[i];
-            validatedCount++;
-
-            // Update progress
-            const progress =
-              5 + Math.round((validatedCount / totalToValidate) * 95);
-            progressBar.style.width = `${progress}%`;
-            progressText.textContent = `Validating transaction ${validatedCount}/${totalToValidate}`;
-
-            // Check if source document exists
-            const fileExists = files.some(
-              (file) => file.name === transaction.sourceFile
-            );
-            if (!fileExists) {
-              sourceMissingCount++;
-            } else {
-              // Perform validation checks
-              const validationResult = validateTransaction(transaction);
-              if (validationResult.status === "valid") {
-                validCount++;
-              } else if (validationResult.status === "warning") {
-                warningCount++;
-              }
-            }
-
-            // Small delay to keep UI responsive
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          }
-
-          // Final update
-          progressBar.style.width = "100%";
-          progressText.textContent = `Validation complete!`;
-
-          // Close the loading dialog after a short delay
-          setTimeout(() => {
-            Swal.close();
-
-            // Show validation results
-            Swal.fire({
-              title: "Validation Complete",
-              html: `
-                <div class="text-left">
-                  <p>Validated ${validatedCount} transactions:</p>
-                  <ul class="mt-2 list-disc pl-5">
-                    <li class="text-green-500">${validCount} valid transactions</li>
-                    <li class="text-yellow-500">${warningCount} transactions with warnings</li>
-                    <li class="text-red-500">${sourceMissingCount} transactions with missing source documents</li>
-                  </ul>
-                  <p class="mt-4">Click on any transaction to verify it against its source document.</p>
-                </div>
-              `,
-              icon: "success",
-              confirmButtonText: "Continue",
-            });
-          }, 1000);
-        }, 500);
+        // Start with the first transaction
+        showTransactionValidation(transactionsToValidate, 0, stats);
       }
     });
+  };
+
+  // Show transaction validation with animation
+  const showTransactionValidation = (transactionsToValidate, index, stats) => {
+    // Check if we've processed all transactions
+    if (index >= transactionsToValidate.length) {
+      // Validation complete
+      setIsValidating(false);
+      setCurrentValidationItem(null);
+
+      // Show validation results
+      Swal.fire({
+        title: "Validation Complete",
+        html: `
+          <div class="text-left">
+            <p>Validated ${stats.total} transactions:</p>
+            <ul class="mt-2 list-disc pl-5">
+              <li class="text-green-500">${stats.valid} valid transactions</li>
+              <li class="text-yellow-500">${stats.warning} transactions with warnings</li>
+              <li class="text-red-500">${stats.error} transactions with missing source documents or errors</li>
+            </ul>
+            <p class="mt-4">Click on any transaction to verify it against its source document.</p>
+          </div>
+        `,
+        icon: "success",
+        confirmButtonText: "Continue",
+      });
+      return;
+    }
+
+    // Get the current transaction
+    const transaction = transactionsToValidate[index];
+
+    // Find the source document
+    const sourceDocument = files.find(
+      (file) => file.name === transaction.sourceFile
+    );
+
+    // Determine validation status
+    let validationStatus = "valid";
+
+    if (!sourceDocument) {
+      validationStatus = "error";
+    } else {
+      // Perform validation checks
+      const validationResult = validateTransaction(transaction);
+      if (validationResult.status === "warning") {
+        validationStatus = "warning";
+      } else if (validationResult.status === "error") {
+        validationStatus = "error";
+      }
+    }
+
+    // Set current validation item
+    setCurrentValidationItem({
+      transaction,
+      document: sourceDocument || {
+        name: transaction.sourceFile || "Unknown",
+        type: "Unknown",
+        date: transaction.date,
+      },
+      status: validationStatus,
+      index,
+      total: transactionsToValidate.length,
+    });
+
+    // Move to the next transaction after a fixed delay
+    setTimeout(() => {
+      showTransactionValidation(transactionsToValidate, index + 1, stats);
+    }, 1500);
   };
 
   return (
@@ -425,6 +445,41 @@ const Validation = ({
           handleFileDownload={handleFileDownload}
           files={files}
         />
+      )}
+
+      {/* Validation Animation */}
+      {isValidating && currentValidationItem && (
+        <div className="mb-6">
+          <div className="bg-gray-900 border border-blue-900/30 rounded-lg p-4 mb-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium text-white">
+                Validation in Progress
+              </h3>
+              <div className="text-sm text-gray-400">
+                Transaction {currentValidationItem.index + 1} of{" "}
+                {currentValidationItem.total}
+              </div>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: `${
+                    ((currentValidationItem.index + 1) /
+                      currentValidationItem.total) *
+                    100
+                  }%`,
+                }}
+              ></div>
+            </div>
+          </div>
+
+          <SimpleValidationAnimation
+            transaction={currentValidationItem.transaction}
+            document={currentValidationItem.document}
+            status={currentValidationItem.status}
+          />
+        </div>
       )}
 
       {/* Header */}
