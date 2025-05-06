@@ -150,31 +150,46 @@ const Analysis = ({ transactions }) => {
     // Hitung rasio keuangan
     const profitMargin = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0;
     
-    // Hitung Current Ratio
+    // Perbaiki perhitungan Current Ratio - pastikan kategori asset dan liability benar
     const currentAssets = transactions
-      .filter(t => t.transactionType === 'income' || t.category === 'asset')
+      .filter(t => t.transactionType === 'income' || (t.category && t.category.toLowerCase() === 'asset'))
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
     
     const currentLiabilities = transactions
-      .filter(t => t.category === 'liability' || t.category === 'debt')
+      .filter(t => (t.category && (t.category.toLowerCase() === 'liability' || t.category.toLowerCase() === 'debt')))
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
     
+    // Hindari simbol infinity, gunakan nilai numerik yang besar jika liabilities = 0
     const currentRatio = currentLiabilities > 0 ? 
       (currentAssets / currentLiabilities).toFixed(2) : 
-      0;
+      (currentAssets > 0 ? '99.99' : '0.00');
 
-    // Hitung Debt Ratio
+    // Perbaiki perhitungan Debt Ratio
     const totalDebts = transactions
-      .filter(t => t.category === 'liability' || t.category === 'debt')
+      .filter(t => (t.category && (t.category.toLowerCase() === 'liability' || t.category.toLowerCase() === 'debt')))
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
     const totalAssets = transactions
-      .filter(t => t.transactionType === 'income' || t.category === 'asset')
+      .filter(t => t.transactionType === 'income' || (t.category && t.category.toLowerCase() === 'asset'))
       .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
+    // Hindari simbol infinity, gunakan nilai 0 jika assets = 0
     const debtRatio = totalAssets > 0 ? 
       (totalDebts / totalAssets).toFixed(2) : 
-      0;
+      (totalDebts > 0 ? '1.00' : '0.00');
+
+    // Tambahkan log untuk debugging
+    console.log('Analysis Data:', {
+      totalIncome,
+      totalExpenses,
+      currentAssets,
+      currentLiabilities,
+      totalDebts,
+      totalAssets,
+      profitMargin,
+      currentRatio,
+      debtRatio
+    });
 
     // Hitung perubahan dari periode sebelumnya
     const currentDate = new Date();
@@ -203,22 +218,22 @@ const Analysis = ({ transactions }) => {
       {
         name: 'Current Ratio',
         value: currentRatio.toString(),
-        change: `${currentRatio > 2 ? '+' : '-'}${Math.abs(currentRatio - 2).toFixed(2)}`,
-        status: currentRatio >= 2 ? 'positive' : 'negative',
+        change: `${parseFloat(currentRatio) > 2 ? '+' : '-'}${Math.abs(parseFloat(currentRatio) - 2).toFixed(2)}`,
+        status: parseFloat(currentRatio) >= 2 ? 'positive' : 'negative',
         description: 'Measures ability to pay short-term obligations'
       },
       {
         name: 'Profit Margin',
         value: `${profitMargin}%`,
-        change: `${profitMarginChange > 0 ? '+' : ''}${profitMarginChange}%`,
-        status: profitMarginChange >= 0 ? 'positive' : 'negative',
+        change: `${parseFloat(profitMargin) > 0 ? '+' : ''}${profitMargin}%`,
+        status: parseFloat(profitMargin) >= 0 ? 'positive' : 'negative',
         description: 'Percentage of revenue that becomes profit'
       },
       {
         name: 'Debt Ratio',
         value: debtRatio.toString(),
-        change: `${debtRatio <= 0.5 ? '-' : '+'}${Math.abs(debtRatio - 0.5).toFixed(2)}`,
-        status: debtRatio <= 0.5 ? 'positive' : 'negative',
+        change: `${parseFloat(debtRatio) < 0.5 ? '+' : '-'}${Math.abs(parseFloat(debtRatio) - 0.5).toFixed(2)}`,
+        status: parseFloat(debtRatio) <= 0.5 ? 'positive' : 'negative',
         description: 'Proportion of assets financed by debt'
       },
     ]);

@@ -22,6 +22,7 @@ import {
 import Swal from "sweetalert2";
 import Logo from "../components/Logo";
 import { storeDocumentPosition } from "../utils/documentPositionTracker";
+import { validateTransactions } from '../utils/transactionUtils';
 
 // Import Accountant components
 import DataInput from "../components/accountant/DataInput";
@@ -426,7 +427,7 @@ function App({ actor, isAuthenticated, login }) {
     return null;
   }
 
-  const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4";
+  const GEMINI_API_KEY = "AIzaSyCH6esa0di5rgxVJHq8Os2YaBIMzFAOUgc";
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -3008,11 +3009,15 @@ File name: ${fileName}`,
                   )}
 
                   {activeSubTab === "reports" && (
-                    <Reports transactions={transactions} />
-                  )}
-
+                      <Reports
+                      transactions={transactions}
+                      files={files}
+                      handleFileDownload={handleFileDownload}
+                      handleFileDelete={handleFileDelete}/>
+                    )}
+                    
                   {activeSubTab === "recommendations" && (
-                    <Recommendations transactions={transactions} />
+                    <Recommendations transactions={transactions}/>
                   )}
                 </>
               )}
