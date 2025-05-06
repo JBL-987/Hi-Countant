@@ -353,6 +353,8 @@ GEMINI_API_KEY=<your-api-key>  # For AI functionality
   </div>
 </div>
 
+### Agentic Accountant
+
 ### Document Processing
 <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px;">
   <div style="text-align: center;">
