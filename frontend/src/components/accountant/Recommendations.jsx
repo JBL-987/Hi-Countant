@@ -60,7 +60,7 @@ const Recommendations = ({ transactions }) => {
   };
 
   const recommendationsFromAI = async (transactions) => {
-    const GEMINI_API_KEY = "AIzaSyA6uSVWMWopA9O1l5F74QeeBw0vA4bU9o4"
+    const GEMINI_API_KEY = "AIzaSyCH6esa0di5rgxVJHq8Os2YaBIMzFAOUgc"
     const prompt = `
         You are a financial analysis assistant. You will receive a JSON array called "transactions" where each transaction has:
     - transactionType: "income" or "expense"
