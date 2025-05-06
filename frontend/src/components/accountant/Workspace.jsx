@@ -197,7 +197,7 @@ const Workspace = ({
 
     if (sourceFolder && fileToMove) {
       // Remove from source folder and add to target folder
-      setFolderStructure((prev) => {
+      setFolderStructure((prev) => {      
         const updatedSourceFiles = prev[sourceFolder].files.filter(
           (file) => file.name !== fileName
         );
